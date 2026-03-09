@@ -14,6 +14,10 @@ service_account_info = json.loads(os.environ["GCP_SA_KEY"])
 spreadsheet_id = os.environ["TVER_DATA_SHEET_ID"]
 JST = timezone(timedelta(hours=+9), 'JST')
 
+# 認証情報の読み込みを確認
+print(f"シートID確認: {spreadsheet_id}")
+# 認証が失敗していればここでエラーが出て止まるはずです
+
 creds = Credentials.from_service_account_info(
     service_account_info,
     scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
@@ -37,6 +41,10 @@ driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () =>
 rows = url_sheet.get_all_records()
 
 for row in rows:
+    rows = url_sheet.get_all_records()
+    print(f"読み込んだ行数: {len(rows)}") # 追加
+for row in rows:
+    print(f"現在処理中の行データ: {row}") # 追加
     # 日本語ヘッダー「実行フラグ」に対応
     if str(row.get("実行フラグ", "")).upper() != "TRUE":
         continue
