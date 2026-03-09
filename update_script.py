@@ -7,10 +7,19 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 import time
 
-# 1. 認証 (Secretsから読み込み)
+# 1. 認証設定 (GitHub Secretsから取得)
 service_account_info = json.loads(os.environ["GCP_SA_KEY"])
 spreadsheet_id = os.environ["TVER_DATA_SHEET_ID"]
-creds = Credentials.from_service_account_info(service_account_info)
+
+# 【ここを修正しました】
+# スコープを明示的に指定して、サービスアカウントの情報を読み込みます
+creds = Credentials.from_service_account_info(
+    service_account_info,
+    scopes=[
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
+)
 client = gspread.authorize(creds)
 spreadsheet = client.open_by_key(spreadsheet_id)
 like_sheet = spreadsheet.worksheet("like_data")
