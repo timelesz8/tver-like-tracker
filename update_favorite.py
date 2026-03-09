@@ -23,7 +23,7 @@ spreadsheet = client.open_by_key(spreadsheet_id)
 url_sheet = spreadsheet.worksheet("program_master")
 fav_sheet = spreadsheet.worksheet("favorite_data")
 
-# 2. ブラウザ設定（ロボットとバレないように）
+# 2. ブラウザ設定
 chrome_options = Options()
 chrome_options.add_argument("--headless=new")
 chrome_options.add_argument("--no-sandbox")
@@ -32,12 +32,12 @@ chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x
 driver = webdriver.Chrome(options=chrome_options)
 driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
 
-# 3. データ取得とループ処理
+# 3. データ取得
 rows = url_sheet.get_all_records()
 print(f"全取得行数: {len(rows)}")
 
 for row in rows:
-    # ヘッダー名が「active」の場合の判定
+    # 実行フラグの判定 (C列などのヘッダーが "active" である前提)
     if str(row.get("active", "")).upper() != "TRUE":
         continue
 
@@ -47,29 +47,31 @@ for row in rows:
 
     print(f"--- 処理開始: {series_id} ---")
     driver.get(url)
-    time.sleep(10) # ページ読み込みをじっくり待つ
+    time.sleep(10) 
 
     try:
-        # お気に入り数の要素を探す
-        fav_elem = driver.find_element(By.XPATH, "//*[contains(text(), 'お気に入り登録')]/following-sibling::span")
-        fav_text = fav_elem.text
+        # 【修正】ページ全体から「お気に入り登録」という文字を探し、その周辺のテキストを取得
+        # 特定の要素に依存せず、ページ内のテキストから直接探します
+        body_text = driver.find_element(By.TAG_NAME, "body").text
         
-        # 数値抽出
-        numbers = re.findall(r'[\d.,万]+', fav_text)
-        if numbers:
-            val = numbers[0]
+        # 「お気に入り登録」という文字列のすぐ後ろにある数値（X.X万）を探す正規表現
+        # 「お気に入り登録」の後にスペースや改行があり、その後に数値が続くパターン
+        match = re.search(r'お気に入り登録\s*([\d\.]+[万]?)', body_text)
+        
+        if match:
+            val = match.group(1)
             fav_count = int(float(val.replace("万", "")) * 10000) if "万" in val else int(val.replace(",", ""))
             
-            # スプレッドシートへ書き込み
+            # 書き込み
             now = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")
             fav_sheet.append_row([now, series_id, fav_count])
-            print(f"成功: {fav_count}")
+            print(f"成功: {series_id} は {fav_count} でした")
         else:
-            raise Exception("数値が見つかりませんでした")
+            raise Exception("お気に入り登録の数値が見つかりませんでした")
 
     except Exception as e:
         print(f"失敗 ({series_id}): {e}")
-        # 失敗したら active を FALSE にする (E列がactiveと仮定)
+        # 失敗したら active を FALSE にする (E列: 5)
         cell = url_sheet.find(series_id)
         if cell:
             url_sheet.update_cell(cell.row, 5, "FALSE")
