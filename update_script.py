@@ -37,14 +37,25 @@ time.sleep(10) # 念のため長めに待機
 
 # 4. 要素を取得してA66に書き込み
 try:
-    # aria-label='あとでみる' ボタンを特定
-    elem = driver.find_element(By.XPATH, "//*[@aria-label='あとでみる']")
-    parent = elem.find_element(By.XPATH, "..")
-    print(f"発見したテキスト: {parent.text}")
+    # ページ内に「あとでみる」があるか確認（find_elementsで複数取得してみる）
+    elems = driver.find_elements(By.XPATH, "//*[@aria-label='あとでみる']")
     
-    # A66に書き込み
-    like_sheet.update_acell('C66', parent.text) # C66に値を入れるテスト
-    print("書き込み完了")
+    print(f"見つかった要素の数: {len(elems)}")
+    
+    if len(elems) > 0:
+        parent = elems[0].find_element(By.XPATH, "..")
+        print(f"発見したテキスト全体: '{parent.text}'")
+        
+        # C66に値を入れるテスト
+        like_sheet.update_acell('C66', parent.text)
+        print("書き込み完了")
+    else:
+        print("警告: 要素が見つかりませんでした")
+        # ページ全体のHTMLを確認用に出力
+        print("--- HTMLの冒頭 ---")
+        print(driver.page_source[:1000])
+        print("--- HTMLの末尾 ---")
+        print(driver.page_source[-1000:])
 except Exception as e:
     print(f"エラー発生: {e}")
     # ページの一部を出力して確認
