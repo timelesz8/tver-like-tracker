@@ -37,8 +37,13 @@ rows = url_sheet.get_all_records()
 print(f"全取得行数: {len(rows)}")
 
 for row in rows:
-    # 実行フラグの判定 (C列などのヘッダーが "active" である前提)
-    if str(row.get("active", "")).upper() != "TRUE":
+    # 修正：ヘッダー名 "active" を直接取得。大文字小文字を区別しないよう処理
+    status = str(row.get("active", "")).upper()
+    
+    # 実行前に、なぜスキップされるかを確認するためのデバッグ出力
+    print(f"ID: {row.get('series_id')}, ステータス: {status}")
+
+    if status != "TRUE":
         continue
 
     url = row.get("番組URL", "")
@@ -50,19 +55,13 @@ for row in rows:
     time.sleep(10) 
 
     try:
-        # 【修正】ページ全体から「お気に入り登録」という文字を探し、その周辺のテキストを取得
-        # 特定の要素に依存せず、ページ内のテキストから直接探します
         body_text = driver.find_element(By.TAG_NAME, "body").text
-        
-        # 「お気に入り登録」という文字列のすぐ後ろにある数値（X.X万）を探す正規表現
-        # 「お気に入り登録」の後にスペースや改行があり、その後に数値が続くパターン
         match = re.search(r'お気に入り登録\s*([\d\.]+[万]?)', body_text)
         
         if match:
             val = match.group(1)
             fav_count = int(float(val.replace("万", "")) * 10000) if "万" in val else int(val.replace(",", ""))
             
-            # 書き込み
             now = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")
             fav_sheet.append_row([now, series_id, fav_count])
             print(f"成功: {series_id} は {fav_count} でした")
@@ -71,7 +70,7 @@ for row in rows:
 
     except Exception as e:
         print(f"失敗 ({series_id}): {e}")
-        # 失敗したら active を FALSE にする (E列: 5)
+        # ヘッダー名が「active」の列をE列(5列目)と指定して更新
         cell = url_sheet.find(series_id)
         if cell:
             url_sheet.update_cell(cell.row, 5, "FALSE")
