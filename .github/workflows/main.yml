@@ -1,28 +1,41 @@
 name: TVerデータ収集実行
 
 on:
-  workflow_dispatch:
-  schedule:
-    - cron: '0 * * * *' # これで「毎時0分」に実行されます
   push:
-    branches: [ main ]
+    branches:
+      - main
+  schedule:
+    # 日本時間の毎時00分に実行 (UTCの 15:00 = JSTの 00:00 なので、0 * * * *)
+    - cron: "0 * * * *"
+  workflow_dispatch: # 手動実行もできるように残します
 
 jobs:
   run-script:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-      # ブラウザ(Chrome)を動かす設定
+
       - name: Setup Chrome
-        uses: browser-actions/setup-chrome@latest
+        uses: browser-actions/setup-chrome@v1
+      
       - name: Install dependencies
         run: |
-          pip install gspread google-auth selenium webdriver-manager
-      - name: Run script
+          pip install gspread oauth2client selenium webdriver-manager
+
+      - name: Run favorite script
         env:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
           TVER_DATA_SHEET_ID: ${{ secrets.TVER_DATA_SHEET_ID }}
         run: python update_favorite.py
+
+      - name: Run original script
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+          TVER_DATA_SHEET_ID: ${{ secrets.TVER_DATA_SHEET_ID }}
+        run: python update_script.py
