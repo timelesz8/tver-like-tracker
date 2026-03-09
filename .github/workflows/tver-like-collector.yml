@@ -30,5 +30,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y google-chrome-stable
 
+          - name: Create credentials
+        run: echo '${{ secrets.GOOGLE_CREDENTIALS }}' > service_account.json
+
       - name: Run script
         run: python test_sheet.py
