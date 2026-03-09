@@ -1,74 +1,44 @@
 import os
 import json
 import gspread
-import datetime
-import re
-import time
 from google.oauth2.service_account import Credentials
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+import time
 
-# 1. 認証設定 (GitHub Secretsから取得)
+# 1. 認証 (Secretsから読み込み)
 service_account_info = json.loads(os.environ["GCP_SA_KEY"])
 spreadsheet_id = os.environ["TVER_DATA_SHEET_ID"]
-
-scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-creds = Credentials.from_service_account_info(service_account_info, scopes=scopes)
+creds = Credentials.from_service_account_info(service_account_info)
 client = gspread.authorize(creds)
-
 spreadsheet = client.open_by_key(spreadsheet_id)
-url_sheet = spreadsheet.worksheet("url_list")
 like_sheet = spreadsheet.worksheet("like_data")
 
-# 2. ブラウザ設定 (GitHub Actions用のヘッドレスモード)
+# 2. ブラウザ設定
 chrome_options = Options()
 chrome_options.add_argument("--headless=new")
-chrome_options.add_argument("--no-sandbox")
-chrome_options.add_argument("--disable-dev-shm-usage")
-# 【追加】画面サイズを大きくして、要素が隠れないようにする
-chrome_options.add_argument("--window-size=1920,1080") 
+chrome_options.add_argument("--window-size=1920,1080")
 driver = webdriver.Chrome(options=chrome_options)
 
-# 3. メイン処理
-rows = url_sheet.get_all_records()
+# 3. 指定のURLにアクセス
+target_url = "https://tver.jp/episodes/epl2lol2f0"
+driver.get(target_url)
+time.sleep(10) # 念のため長めに待機
 
-for row in rows:
-    # active列がTRUEのものだけ処理
-    if str(row.get("active", "")).upper() != "TRUE":
-        continue
-
-    url = row.get("url", "")
-    if not url: continue
-
-    episode_id = url.split("/")[-1]
-    print(f"取得中: {episode_id}")
+# 4. 要素を取得してA66に書き込み
+try:
+    # aria-label='あとでみる' ボタンを特定
+    elem = driver.find_element(By.XPATH, "//*[@aria-label='あとでみる']")
+    parent = elem.find_element(By.XPATH, "..")
+    print(f"発見したテキスト: {parent.text}")
     
-    driver.get(url)
-    time.sleep(6) # ページ読み込み待ち
-
-    try:
-        # TVerの「あとでみる」ボタン付近から数値を抽出
-        elem = driver.find_element(By.XPATH, "//*[@aria-label='あとでみる']")
-        parent = elem.find_element(By.XPATH, "..")
-        text = parent.text
-        numbers = re.findall(r'[\d.,万]+', text)
-        
-        if numbers:
-            like_raw = numbers[0]
-            if "万" in like_raw:
-                like = int(float(like_raw.replace("万", "")) * 10000)
-            else:
-                like = int(like_raw.replace(",", ""))
-        else:
-            like = 0
-            
-    except Exception as e:
-        print(f"取得失敗: {episode_id}, {e}")
-        like = 0
-
-    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    like_sheet.append_row([now, episode_id, like])
-    print(f"書き込み完了: {episode_id}, {like}")
+    # A66に書き込み
+    like_sheet.update_acell('C66', parent.text) # C66に値を入れるテスト
+    print("書き込み完了")
+except Exception as e:
+    print(f"エラー発生: {e}")
+    # ページの一部を出力して確認
+    print(driver.page_source[:500])
 
 driver.quit()
