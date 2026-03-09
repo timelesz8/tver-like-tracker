@@ -2,6 +2,8 @@ name: TVerデータ収集実行
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 * * * *' # これで「毎時0分」に実行されます
   push:
     branches: [ main ]
 
