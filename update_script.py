@@ -23,9 +23,11 @@ like_sheet = spreadsheet.worksheet("like_data")
 
 # 2. ブラウザ設定 (GitHub Actions用のヘッドレスモード)
 chrome_options = Options()
-chrome_options.add_argument("--headless=new") # 画面を出さずに実行
+chrome_options.add_argument("--headless=new")
 chrome_options.add_argument("--no-sandbox")
 chrome_options.add_argument("--disable-dev-shm-usage")
+# 【追加】画面サイズを大きくして、要素が隠れないようにする
+chrome_options.add_argument("--window-size=1920,1080") 
 driver = webdriver.Chrome(options=chrome_options)
 
 # 3. メイン処理
