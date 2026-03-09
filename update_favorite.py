@@ -1,20 +1,29 @@
 # 既存のロジックに続けて、お気に入り数取得部分を追記
 try:
-    # ページ全体から「お気に入り数」という文字を含む要素を探す
-    fav_elem = driver.find_element(By.XPATH, "//*[contains(text(), 'お気に入り数')]")
-    fav_text = fav_elem.text  # 例: "お気に入り数31.9万"
-    
-    # 数値を抽出
-    fav_numbers = re.findall(r'[\d.,万]+', fav_text)
-    if fav_numbers:
-        fav_raw = fav_numbers[0]
-        # 「万」を数値に変換（必要に応じて調整）
-        if "万" in fav_raw:
-            favorite_count = int(float(fav_raw.replace("万", "")) * 10000)
+        # 「お気に入り登録」というテキストを含む要素を探す
+        # その要素の親（または兄弟要素）に数値が含まれているはずです
+        fav_elem = driver.find_element(By.XPATH, "//*[contains(text(), 'お気に入り登録')]")
+        
+        # 今回は「お気に入り登録」という文字の後に数値が来る構造と仮定して、
+        # その要素が含まれる大きなブロックのテキストを取得します
+        parent = fav_elem.find_element(By.XPATH, "../..") # 構造に合わせて .. の数を調整してください
+        text = parent.text
+        
+        print(f"発見したお気に入りテキスト: {text}")
+        
+        # 数値抽出 (例: 18.6万)
+        numbers = re.findall(r'[\d.,万]+', text)
+        
+        if numbers:
+            fav_raw = numbers[0]
+            if "万" in fav_raw:
+                favorite_count = int(float(fav_raw.replace("万", "")) * 10000)
+            else:
+                favorite_count = int(fav_raw.replace(",", ""))
+            print(f"取得したお気に入り数: {favorite_count}")
         else:
-            favorite_count = int(fav_raw.replace(",", ""))
-    else:
+            favorite_count = 0
+            
+    except Exception as e:
+        print(f"お気に入り数取得失敗: {e}")
         favorite_count = 0
-except Exception as e:
-    print(f"お気に入り数取得失敗 ({episode_id}): {e}")
-    favorite_count = 0
