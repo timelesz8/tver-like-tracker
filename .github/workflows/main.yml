@@ -1,0 +1,31 @@
+name: TVerデータ収集実行
+
+on:
+  # 手動で実行ボタンを押せるようにする設定
+  workflow_dispatch:
+  # pushした時にも動くようにする設定
+  push:
+    branches: [ main ]
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+    steps:
+      - name: コードをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: Pythonをセットアップ
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: 必要なライブラリをインストール
+        run: |
+          pip install gspread google-auth
+
+      - name: スクリプトを実行
+        env:
+          # 金庫の中身をプログラムに橋渡しする
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+          TVER_DATA_SHEET_ID: ${{ secrets.TVER_DATA_SHEET_ID }}
+        run: python update_script.py
