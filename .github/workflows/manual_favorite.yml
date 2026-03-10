@@ -1,0 +1,29 @@
+name: 【手動】番組お気に入り収集
+
+on:
+  workflow_dispatch: # これにより、GitHubのActionsタブから「Run workflow」ボタンで手動実行可能になります
+
+jobs:
+  run-favorite-only:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Setup Chrome
+        uses: browser-actions/setup-chrome@latest
+      
+      - name: Install dependencies
+        run: |
+          pip install gspread oauth2client selenium
+
+      - name: Run favorite script
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+          TVER_DATA_SHEET_ID: ${{ secrets.TVER_DATA_SHEET_ID }}
+        run: python program_favorite.py
