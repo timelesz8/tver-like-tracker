@@ -11,15 +11,32 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-# 1. 設定と認証 (環境変数は既存のものを使用)
-service_account_info = json.loads(os.environ["GCP_SA_KEY"])
-spreadsheet_id = os.environ["TVER_DATA_SHEET_ID"]
-JST = timezone(timedelta(hours=+9), 'JST')
+Gemini の回答
+GitHub Actionsのログにある RefreshError は、ほとんどの場合、GitHub Secretsの文字列が正しく環境変数にロードされていないことが原因です。
 
-creds = Credentials.from_service_account_info(
-    service_account_info,
-    scopes=["[https://www.googleapis.com/auth/spreadsheets](https://www.googleapis.com/auth/spreadsheets)", "[https://www.googleapis.com/auth/drive](https://www.googleapis.com/auth/drive)"]
+YAMLを介さずに（つまり、Actionsの設定ファイルをいじらずに）コード側でこのエラーを回避・デバッグするための確実な手順をお伝えします。
+
+1. 認証情報をファイルとして保存する
+環境変数経由の読み込み (json.loads) は、改行コードのズレなどで失敗しやすいです。以下のコードのように、プログラムの中で一旦キーをファイルとして保存してから読み込む方法に書き換えてみてください。
+
+Python
+# 1. 設定と認証部分を以下のように修正
+import os
+import json
+
+# GitHub Secretsの値を環境変数から取得
+key_json_str = os.environ.get("GCP_SA_KEY")
+
+# 一旦ファイルとして書き出す
+with open("sa_key.json", "w") as f:
+    f.write(key_json_str)
+
+# ファイルから認証情報をロードする
+creds = Credentials.from_service_account_file(
+    "sa_key.json",
+    scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
 )
+
 client = gspread.authorize(creds)
 spreadsheet = client.open_by_key(spreadsheet_id)
 program_sheet = spreadsheet.worksheet("program_master")
