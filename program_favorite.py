@@ -24,21 +24,19 @@ spreadsheet = client.open_by_key(spreadsheet_id)
 program_sheet = spreadsheet.worksheet("program_master")
 fav_sheet = spreadsheet.worksheet("favorite_data")
 
-# 2. ブラウザ設定
+# 2. ブラウザ設定 (update_script.py と同じ設定に統一)
 chrome_options = Options()
 chrome_options.add_argument("--headless=new")
 chrome_options.add_argument("--no-sandbox")
 chrome_options.add_argument("--disable-dev-shm-usage")
-chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36")
+chrome_options.add_argument("--window-size=1920,1080")
+chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
 driver = webdriver.Chrome(options=chrome_options)
-driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
 
-# 3. データ取得
-# ヘッダー行を明示的に指定して重複エラーを回避
+# 3. メイン処理
 rows = program_sheet.get_all_records(head=1)
 
 for idx, row in enumerate(rows):
-    # E列(active)がTRUEか判定
     if str(row.get("active", "")).upper() != "TRUE":
         continue
 
@@ -51,23 +49,20 @@ for idx, row in enumerate(rows):
     time.sleep(5) 
 
     try:
-        # ページ全体のテキストからリダイレクト検知
-        body_text = driver.find_element(By.TAG_NAME, "body").text
-        if "ログイン" in body_text[:100] and "マイページ" in body_text[:100]:
-             raise Exception("トップページにリダイレクトされました")
+        # リダイレクト検知を強化
+        if "tver.jp/" not in driver.current_url or "home" in driver.current_url:
+             raise Exception("トップページへリダイレクトされました")
 
-        # 「お気に入り登録」の隣の数値を探すロジック
-        # 画面の表示構造に基づき、テキストノードを検索
-        elements = driver.find_elements(By.XPATH, "//*[contains(text(), 'お気に入り登録')]")
+        # 番組ページのお気に入り数取得 (TVer構造に対応)
+        # 画面の表示(18.6万)を捉えるため、テキスト要素を直接検索
+        elements = driver.find_elements(By.XPATH, "//*[contains(text(), 'お気に入り')]")
         
         fav_count = None
         for el in elements:
-            # ボタンの親要素のテキストを取得
-            parent_text = el.find_element(By.XPATH, "..").text
-            match = re.search(r'([\d\.]+[万]?)', parent_text.replace("お気に入り登録", "").strip())
-            if match:
-                val = match.group(1)
-                fav_count = int(float(val.replace("万", "")) * 10000) if "万" in val else int(val.replace(",", ""))
+            # 「お気に入り」という文字が含まれるタグを探し、数値を抽出
+            numbers = re.findall(r'[\d\.]+[万]?', el.text)
+            if numbers:
+                fav_count = int(float(numbers[0].replace("万", "")) * 10000) if "万" in numbers[0] else int(numbers[0].replace(",", ""))
                 break
         
         if fav_count is not None:
@@ -80,7 +75,6 @@ for idx, row in enumerate(rows):
     except Exception as e:
         print(f"失敗 ({series_id}): {e}")
         # E列(5列目)をFALSEに更新
-        row_number = idx + 2
-        program_sheet.update_cell(row_number, 5, "FALSE")
+        program_sheet.update_cell(idx + 2, 5, "FALSE")
 
 driver.quit()
