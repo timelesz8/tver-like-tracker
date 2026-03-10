@@ -32,10 +32,10 @@ jobs:
         env:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
           TVER_DATA_SHEET_ID: ${{ secrets.TVER_DATA_SHEET_ID }}
-        run: python update_favorite.py
+        run: python program_favorite.py
 
       - name: Run original script
         env:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
           TVER_DATA_SHEET_ID: ${{ secrets.TVER_DATA_SHEET_ID }}
-        run: python update_script.py
+        run: python episode_like.py
