@@ -66,9 +66,10 @@ for idx, row in enumerate(rows):
                 break
         
         if fav_count is not None:
+            # 【ここを修正】日本時間を明示的に指定してnowを作成
             now = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")
             fav_sheet.append_row([now, series_id, fav_count])
-            print(f"成功: {series_id} = {fav_count}")
+            print(f"成功: {series_id} = {fav_count} (時刻: {now})")
         else:
             raise Exception("数値が見つかりませんでした")
 
