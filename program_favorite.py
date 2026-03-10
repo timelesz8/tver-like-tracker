@@ -11,7 +11,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-# 1. 環境設定
+# 1. 設定
 os.environ['TZ'] = 'Asia/Tokyo'
 service_account_info = json.loads(os.environ["GCP_SA_KEY"])
 spreadsheet_id = os.environ["TVER_DATA_SHEET_ID"]
@@ -41,12 +41,16 @@ driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () =>
 rows = program_sheet.get_all_records(head=1)
 
 for idx, row in enumerate(rows):
+    # active列(E列)がTRUEの行のみ実行
     if str(row.get("active", "")).upper() != "TRUE":
         continue
 
     url = row.get("番組URL", "")
     series_id = row.get("番組_id", "")
+    
+    # URLが空の場合はスキップし、FALSEには書き換えない
     if not url:
+        print(f"スキップ: {series_id} (URLが空です)")
         continue
 
     print(f"--- 処理開始: {series_id} ---")
@@ -57,11 +61,11 @@ for idx, row in enumerate(rows):
         
         # リダイレクト検知
         if "tver.jp/series/" not in driver.current_url:
-            raise Exception(f"リダイレクトされました: {driver.current_url}")
+             raise Exception(f"リダイレクトされました: {driver.current_url}")
 
-        # お気に入り要素の待機と取得
-        fav_element = wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'お気に入り')]")))
-        full_text = fav_element.find_element(By.XPATH, "..").text
+        # お気に入り数要素の取得
+        fav_container = wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'お気に入り')]")))
+        full_text = fav_container.find_element(By.XPATH, "..").text
         
         # 数値抽出
         numbers = re.findall(r'[\d\.]+[万]?', full_text)
@@ -77,6 +81,7 @@ for idx, row in enumerate(rows):
 
     except Exception as e:
         print(f"失敗 ({series_id}): {e}")
+        # URLがあるのに取得失敗した場合のみFALSEに更新（空行は更新しない）
         program_sheet.update_cell(idx + 2, 5, "FALSE")
 
 driver.quit()
