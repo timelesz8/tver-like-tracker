@@ -5,9 +5,9 @@ on:
     branches:
       - main
   schedule:
-    # 日本時間の毎時00分に実行 (UTCの 15:00 = JSTの 00:00 なので、0 * * * *)
-    - cron: "0 * * * *"
-  workflow_dispatch: # 手動実行もできるように残します
+    # 日本時間の毎時00分に実行するためには、UTCの毎時15分に設定する
+    - cron: "15 * * * *"
+  workflow_dispatch:
 
 jobs:
   run-script:
@@ -22,11 +22,12 @@ jobs:
           python-version: '3.10'
 
       - name: Setup Chrome
-        uses: browser-actions/setup-chrome@v1
+        uses: browser-actions/setup-chrome@latest
       
       - name: Install dependencies
         run: |
-          pip install gspread oauth2client selenium webdriver-manager
+          pip install gspread oauth2client selenium
+          # webdriver-managerはブラウザのセットアップ手法によっては不要です
 
       - name: Run favorite script
         env:
