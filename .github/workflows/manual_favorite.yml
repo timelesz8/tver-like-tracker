@@ -17,10 +17,12 @@ jobs:
 
       - name: Setup Chrome
         uses: browser-actions/setup-chrome@latest
-      
+        
       - name: Install dependencies
         run: |
-          pip install gspread oauth2client selenium
+          pip install --upgrade pip
+          pip install gspread oauth2client selenium==4.18.1
+
 
       - name: Run favorite script
         env:
