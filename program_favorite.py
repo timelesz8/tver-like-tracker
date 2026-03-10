@@ -7,9 +7,10 @@ from datetime import datetime, timezone, timedelta
 from google.oauth2.service_account import Credentials
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 
-# 1. 認証とシートの準備
+# 1. 設定
 service_account_info = json.loads(os.environ["GCP_SA_KEY"])
 spreadsheet_id = os.environ["TVER_DATA_SHEET_ID"]
 JST = timezone(timedelta(hours=+9), 'JST')
@@ -24,18 +25,23 @@ spreadsheet = client.open_by_key(spreadsheet_id)
 program_sheet = spreadsheet.worksheet("program_master")
 fav_sheet = spreadsheet.worksheet("favorite_data")
 
-# 2. ブラウザ設定
+# 2. ブラウザ設定（リダイレクト回避のため強力に設定）
 chrome_options = Options()
 chrome_options.add_argument("--headless=new")
 chrome_options.add_argument("--no-sandbox")
 chrome_options.add_argument("--disable-dev-shm-usage")
-chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
-driver = webdriver.Chrome(options=chrome_options)
+# ユーザーエージェントと言語設定を偽装
+chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36")
+chrome_options.add_argument("--lang=ja-JP")
 
-# 3. データ取得と保存
+driver = webdriver.Chrome(options=chrome_options)
+# ボット判定を回避するためのJS実行
+driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+
+# 3. データ取得
 rows = program_sheet.get_all_records()
 
-for idx, row in enumerate(rows):
+for row in rows:
     if str(row.get("active", "")).upper() != "TRUE":
         continue
 
@@ -45,17 +51,18 @@ for idx, row in enumerate(rows):
 
     print(f"--- 処理開始: {series_id} ---")
     driver.get(url)
-    # ご指定通り5秒に短縮
     time.sleep(5) 
 
     try:
         body_text = driver.find_element(By.TAG_NAME, "body").text
         
-        # リダイレクトチェック
-        if "ログイン" in body_text[:50] and "マイページ" in body_text[:50]:
-             raise Exception("トップページにリダイレクトされました")
+        # リダイレクトチェック（トップページではないか）
+        if "ログイン" in body_text[:100] and "マイページ" in body_text[:100]:
+             # 念のためもう一度だけアクセスしてみる
+             driver.get(url)
+             time.sleep(5)
+             body_text = driver.find_element(By.TAG_NAME, "body").text
 
-        # 正規表現でお気に入り数を探す
         match = re.search(r'([\d\.]+[万]?)お気に入り', body_text)
         
         if match:
@@ -72,4 +79,3 @@ for idx, row in enumerate(rows):
         print(f"失敗 ({series_id}): {e}")
 
 driver.quit()
-print("すべての処理が完了しました")
