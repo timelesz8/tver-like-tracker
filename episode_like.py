@@ -20,7 +20,7 @@ creds = Credentials.from_service_account_info(
 )
 client = gspread.authorize(creds)
 spreadsheet = client.open_by_key(spreadsheet_id)
-url_sheet = spreadsheet.worksheet("url_list")
+url_sheet = spreadsheet.worksheet("episode_master")
 like_sheet = spreadsheet.worksheet("like_data")
 
 # 2. ブラウザ設定
