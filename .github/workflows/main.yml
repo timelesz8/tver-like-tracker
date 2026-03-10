@@ -5,7 +5,7 @@ on:
     branches:
       - main
   schedule:
-    # 日本時間の毎時00分に実行するためには、UTCの毎時15分に設定する
+    # 日本時間の毎時00分実行（UTCの毎時15分）
     - cron: "15 * * * *"
   workflow_dispatch:
 
@@ -23,17 +23,18 @@ jobs:
 
       - name: Setup Chrome
         uses: browser-actions/setup-chrome@latest
-      
+        
       - name: Install dependencies
         run: |
-          pip install gspread oauth2client selenium
-          # webdriver-managerはブラウザのセットアップ手法によっては不要です
+          pip install --upgrade pip
+          pip install gspread oauth2client selenium==4.18.1
 
-      - name: Run favorite script
-        env:
-          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
-          TVER_DATA_SHEET_ID: ${{ secrets.TVER_DATA_SHEET_ID }}
-        run: python program_favorite.py
+      # program_favorite.py はエラーが出るため、一旦ここをコメントアウトまたは削除します
+      # - name: Run favorite script
+      #   env:
+      #     GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+      #     TVER_DATA_SHEET_ID: ${{ secrets.TVER_DATA_SHEET_ID }}
+      #   run: python program_favorite.py
 
       - name: Run original script
         env:
