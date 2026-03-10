@@ -1,7 +1,6 @@
 import os
 import json
 import gspread
-import re
 import time
 from datetime import datetime, timezone, timedelta
 from google.oauth2.service_account import Credentials
@@ -11,32 +10,16 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-Gemini の回答
-GitHub Actionsのログにある RefreshError は、ほとんどの場合、GitHub Secretsの文字列が正しく環境変数にロードされていないことが原因です。
+# 1. 設定と認証
+# 環境変数から読み込む形式（これが一番GitHub Actionsで標準的です）
+service_account_info = json.loads(os.environ["GCP_SA_KEY"])
+spreadsheet_id = os.environ["TVER_DATA_SHEET_ID"]
+JST = timezone(timedelta(hours=+9), 'JST')
 
-YAMLを介さずに（つまり、Actionsの設定ファイルをいじらずに）コード側でこのエラーを回避・デバッグするための確実な手順をお伝えします。
-
-1. 認証情報をファイルとして保存する
-環境変数経由の読み込み (json.loads) は、改行コードのズレなどで失敗しやすいです。以下のコードのように、プログラムの中で一旦キーをファイルとして保存してから読み込む方法に書き換えてみてください。
-
-Python
-# 1. 設定と認証部分を以下のように修正
-import os
-import json
-
-# GitHub Secretsの値を環境変数から取得
-key_json_str = os.environ.get("GCP_SA_KEY")
-
-# 一旦ファイルとして書き出す
-with open("sa_key.json", "w") as f:
-    f.write(key_json_str)
-
-# ファイルから認証情報をロードする
-creds = Credentials.from_service_account_file(
-    "sa_key.json",
+creds = Credentials.from_service_account_info(
+    service_account_info,
     scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
 )
-
 client = gspread.authorize(creds)
 spreadsheet = client.open_by_key(spreadsheet_id)
 program_sheet = spreadsheet.worksheet("program_master")
@@ -50,7 +33,6 @@ chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x
 driver = webdriver.Chrome(options=chrome_options)
 
 def parse_favorite_count(text):
-    """ '3.5万' や '1,234' を数値に変換 """
     text = text.replace(",", "").replace("お気に入り済み", "").replace("お気に入り登録", "").strip()
     if "万" in text:
         return int(float(text.replace("万", "")) * 10000)
@@ -64,14 +46,13 @@ for idx, row in enumerate(rows):
         continue
 
     url = row.get("番組URL", "")
+    if not url: continue
     program_id = url.split("/")[-1]
     
     try:
         driver.get(url)
-        # 人間っぽく少し待機
         time.sleep(5) 
         
-        # 'お気に入り登録' または 'お気に入り済み' の両方に対応するXPath
         xpath_query = "//*[contains(@aria-label, 'お気に入り')]"
         element = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, xpath_query)))
         
