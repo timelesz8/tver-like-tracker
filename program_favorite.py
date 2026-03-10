@@ -2,6 +2,7 @@ import os
 import json
 import gspread
 import time
+import re
 from datetime import datetime, timezone, timedelta
 from google.oauth2.service_account import Credentials
 from selenium import webdriver
@@ -24,21 +25,14 @@ spreadsheet = client.open_by_key(spreadsheet_id)
 program_sheet = spreadsheet.worksheet("program_master")
 fav_sheet = spreadsheet.worksheet("favorite_data")
 
-# 2. ブラウザ設定（人間っぽさを強化）
+# 2. ブラウザ設定
 chrome_options = Options()
 chrome_options.add_argument("--headless=new")
 chrome_options.add_argument("--no-sandbox")
-chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-chrome_options.add_experimental_option('useAutomationExtension', False)
+chrome_options.add_argument("--disable-dev-shm-usage")
+chrome_options.add_argument("--window-size=1920,1080")
 chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
 driver = webdriver.Chrome(options=chrome_options)
-
-def parse_favorite_count(text):
-    text = text.replace(",", "").replace("お気に入り済み", "").replace("お気に入り登録", "").strip()
-    if "万" in text:
-        return int(float(text.replace("万", "")) * 10000)
-    return int(text)
 
 # 3. メイン処理
 rows = program_sheet.get_all_records()
@@ -53,23 +47,33 @@ for idx, row in enumerate(rows):
     
     try:
         driver.get(url)
-        time.sleep(7) # 少し長めに待機
+        # コンテンツの描画を待つ
+        time.sleep(5)
         
-        xpath_query = "//*[contains(@aria-label, 'お気に入り')]"
-        element = WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.XPATH, xpath_query)))
+        # お気に入りボタンが含まれる要素を特定
+        # 画面上の「お気に入り登録」などのラベルを持つ要素を探す
+        wait = WebDriverWait(driver, 15)
+        elem = wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(@aria-label, 'お気に入り')]")))
         
-        raw_text = element.get_attribute("aria-label")
-        count = parse_favorite_count(raw_text)
+        # episode_like.py と同様に親要素経由でテキストを取得して正規化
+        parent = elem.find_element(By.XPATH, "..")
+        text = parent.text
+        
+        # 数値抽出（例: 3.5万 -> 35000）
+        numbers = re.findall(r'[\d.,万]+', text)
+        if not numbers:
+            raise Exception("数値が見つかりませんでした")
+            
+        fav_val = numbers[0].replace(",", "")
+        count = int(float(fav_val.replace("万", "")) * 10000) if "万" in fav_val else int(fav_val)
         
         now = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")
         fav_sheet.append_row([now, program_id, count])
         print(f"取得成功: {program_id} = {count}")
         
     except Exception as e:
-        # スクリーンショットを保存（GitHub Actionsのログと一緒に確認可能にする）
-        screenshot_name = f"error_{program_id}.png"
-        driver.save_screenshot(screenshot_name)
-        print(f"エラー発生: {program_id}, 型: {type(e).__name__}, メッセージ: {str(e)}")
-        print(f"スクリーンショットを保存しました: {screenshot_name}")
+        # デバッグ用にスクリーンショットを保存
+        driver.save_screenshot(f"error_{program_id}.png")
+        print(f"エラー発生: {program_id}, {e}")
 
 driver.quit()
