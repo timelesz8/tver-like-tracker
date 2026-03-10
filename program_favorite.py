@@ -41,47 +41,44 @@ driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () =>
 rows = program_sheet.get_all_records(head=1)
 
 for idx, row in enumerate(rows):
-    # active列(E列)がTRUEの行のみ実行
     if str(row.get("active", "")).upper() != "TRUE":
         continue
 
     url = row.get("番組URL", "")
     series_id = row.get("番組_id", "")
-    
-    # URLが空の場合はスキップし、FALSEには書き換えない
     if not url:
-        print(f"スキップ: {series_id} (URLが空です)")
         continue
 
     print(f"--- 処理開始: {series_id} ---")
     
     try:
         driver.get(url)
-        wait = WebDriverWait(driver, 10)
-        
-        # リダイレクト検知
+        # 数値のレンダリングを待つ時間を確保
+        time.sleep(10) 
+
         if "tver.jp/series/" not in driver.current_url:
              raise Exception(f"リダイレクトされました: {driver.current_url}")
 
-        # お気に入り数要素の取得
-        fav_container = wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'お気に入り')]")))
-        full_text = fav_container.find_element(By.XPATH, "..").text
+        # 修正: ボタン全体を囲む要素を探す（class名が不明なため、より広い範囲の要素を取得）
+        # 「お気に入り」を含むボタンやその親要素をすべて取得してテキストを結合
+        wait = WebDriverWait(driver, 10)
+        fav_buttons = wait.until(EC.presence_of_all_elements_located((By.XPATH, "//*[contains(text(), 'お気に入り')]")))
         
-        # 数値抽出
+        full_text = ""
+        for btn in fav_buttons:
+            full_text += btn.text + " "
+
+        # 数値抽出（「3.5万」のような形式）
         numbers = re.findall(r'[\d\.]+[万]?', full_text)
+        
         if numbers:
-            val = numbers[0]
+            val = numbers[-1] # 最後に出た数値が最新のものと仮定
             fav_count = int(float(val.replace("万", "")) * 10000) if "万" in val else int(val.replace(",", ""))
             
             now = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")
             fav_sheet.append_row([now, series_id, fav_count])
             print(f"成功: {series_id} = {fav_count} (時刻: {now})")
         else:
-            raise Exception(f"数値が見つかりませんでした。テキスト: {full_text}")
-
-    except Exception as e:
-        print(f"失敗 ({series_id}): {e}")
-        # URLがあるのに取得失敗した場合のみFALSEに更新（空行は更新しない）
-        program_sheet.update_cell(idx + 2, 5, "FALSE")
+            raise Exception(f"数値が見つかりませんでした。取得テキスト: {full_text}")
 
 driver.quit()
