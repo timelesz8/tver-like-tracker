@@ -20,7 +20,9 @@ creds = Credentials.from_service_account_info(
 )
 client = gspread.authorize(creds)
 spreadsheet = client.open_by_key(spreadsheet_id)
-url_sheet = spreadsheet.worksheet("program_master")
+
+# シート名の指定を修正
+url_sheet = spreadsheet.worksheet("episode_master")
 fav_sheet = spreadsheet.worksheet("favorite_data")
 
 # 2. ブラウザ設定
@@ -30,24 +32,23 @@ chrome_options.add_argument("--no-sandbox")
 chrome_options.add_argument("--disable-dev-shm-usage")
 chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/122.0.0.0")
 driver = webdriver.Chrome(options=chrome_options)
-driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
 
 # 3. データ取得
 rows = url_sheet.get_all_records()
 print(f"全取得行数: {len(rows)}")
 
-for row in rows:
-    # 修正：ヘッダー名 "active" を直接取得。大文字小文字を区別しないよう処理
+for idx, row in enumerate(rows):
+    # active列(O列)がTRUEの行のみ処理
     status = str(row.get("active", "")).upper()
-    
-    # 実行前に、なぜスキップされるかを確認するためのデバッグ出力
-    print(f"ID: {row.get('series_id')}, ステータス: {status}")
-
     if status != "TRUE":
         continue
 
-    url = row.get("番組URL", "")
-    series_id = row.get("series_id", "")
+    # 番組URLからIDを抽出、取れない場合はseries_id列を参照
+    url = row.get("url", "")
+    series_id = row.get("番組_id", "") # シートのヘッダー名に合わせてください
+    if not series_id and "/series/" in url:
+        series_id = url.split("/series/")[1].split("/")[0]
+        
     if not url: continue
 
     print(f"--- 処理開始: {series_id} ---")
@@ -56,6 +57,7 @@ for row in rows:
 
     try:
         body_text = driver.find_element(By.TAG_NAME, "body").text
+        # 数値抽出の正規表現を調整
         match = re.search(r'お気に入り登録\s*([\d\.]+[万]?)', body_text)
         
         if match:
@@ -64,17 +66,16 @@ for row in rows:
             
             now = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")
             fav_sheet.append_row([now, series_id, fav_count])
-            print(f"成功: {series_id} は {fav_count} でした")
+            print(f"成功: {series_id} = {fav_count}")
         else:
             raise Exception("お気に入り登録の数値が見つかりませんでした")
 
     except Exception as e:
         print(f"失敗 ({series_id}): {e}")
-        # ヘッダー名が「active」の列をE列(5列目)と指定して更新
-        cell = url_sheet.find(series_id)
-        if cell:
-            url_sheet.update_cell(cell.row, 5, "FALSE")
-            print("ステータスを FALSE に更新しました")
+        # O列(15列目)の active を FALSE に更新
+        row_number = idx + 2
+        url_sheet.update_cell(row_number, 15, "FALSE")
+        print("ステータスを FALSE に更新しました")
 
 driver.quit()
 print("すべての処理が完了しました")
