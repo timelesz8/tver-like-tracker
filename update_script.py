@@ -20,7 +20,6 @@ creds = Credentials.from_service_account_info(
 )
 client = gspread.authorize(creds)
 spreadsheet = client.open_by_key(spreadsheet_id)
-# 修正: シート名を url_list に合わせています
 url_sheet = spreadsheet.worksheet("url_list")
 like_sheet = spreadsheet.worksheet("like_data")
 
@@ -37,7 +36,7 @@ driver = webdriver.Chrome(options=chrome_options)
 rows = url_sheet.get_all_records()
 
 for idx, row in enumerate(rows):
-    # F列(active)がTRUEの行のみ処理
+    # active列(O列)がTRUEの行のみ処理
     if str(row.get("active", "")).upper() != "TRUE":
         continue
 
@@ -51,28 +50,27 @@ for idx, row in enumerate(rows):
         driver.get(url)
         time.sleep(3)
         
-        # ページが存在しない場合の判定
         if "404" in driver.title or "ページが見つかりません" in driver.page_source:
             raise Exception("Page Not Found")
 
-        # あとでみる数取得
         elem = driver.find_element(By.XPATH, "//*[@aria-label='あとでみる']")
         parent = elem.find_element(By.XPATH, "..")
         numbers = re.findall(r'[\d.,万]+', parent.text)
         
         like = int(float(numbers[0].replace("万", "")) * 10000) if "万" in numbers[0] else int(numbers[0].replace(",", ""))
         
-        # 成功時はlike_dataに記録
         now = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")
         like_sheet.append_row([now, episode_id, like])
         print(f"取得成功: {episode_id} = {like}")
 
     except Exception as e:
         print(f"エラー発生: {episode_id}, {e}")
-        # ①②: エラーなら active を FALSE にし、end_date(F列)とactual_end_date(H列)を更新
+        # 列の移動に合わせて修正
+        # active(O列) = 15列目, end_date(Q列) = 17列目, days_active(R列) = 18列目
         today = datetime.now(JST).strftime("%Y-%m-%d")
-        url_sheet.update_cell(row_number, 6, "FALSE") # F列: active
-        url_sheet.update_cell(row_number, 7, today)    # G列: end_date
-        url_sheet.update_cell(row_number, 8, today)    # H列: actual_end_date
+        url_sheet.update_cell(row_number, 15, "FALSE") # O列: active
+        url_sheet.update_cell(row_number, 17, today)    # Q列: end_date
+        # R列(days_active)はスプレッドシートの関数が自動計算するため更新不要
+        print(f"ステータスを更新しました (行: {row_number})")
 
 driver.quit()
