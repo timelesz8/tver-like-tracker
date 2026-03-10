@@ -1,7 +1,10 @@
-name: 【手動】番組お気に入り収集
+name: 【自動/手動】番組お気に入り収集
 
 on:
-  workflow_dispatch: # これにより、GitHubのActionsタブから「Run workflow」ボタンで手動実行可能になります
+  workflow_dispatch: # 手動実行用
+  schedule:
+    # 日本時間の毎時00分＝UTCの毎時15分
+    - cron: "15 * * * *"
 
 jobs:
   run-favorite-only:
@@ -22,7 +25,6 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install gspread oauth2client selenium==4.18.1
-
 
       - name: Run favorite script
         env:
