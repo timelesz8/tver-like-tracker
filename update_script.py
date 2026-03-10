@@ -20,10 +20,11 @@ creds = Credentials.from_service_account_info(
 )
 client = gspread.authorize(creds)
 spreadsheet = client.open_by_key(spreadsheet_id)
+# 修正: シート名を url_list に合わせています
 url_sheet = spreadsheet.worksheet("url_list")
 like_sheet = spreadsheet.worksheet("like_data")
 
-# 2. ブラウザ設定 (Actions用)
+# 2. ブラウザ設定
 chrome_options = Options()
 chrome_options.add_argument("--headless=new")
 chrome_options.add_argument("--no-sandbox")
@@ -35,7 +36,8 @@ driver = webdriver.Chrome(options=chrome_options)
 # 3. メイン処理
 rows = url_sheet.get_all_records()
 
-for row in rows:
+for idx, row in enumerate(rows):
+    # F列(active)がTRUEの行のみ処理
     if str(row.get("active", "")).upper() != "TRUE":
         continue
 
@@ -43,28 +45,34 @@ for row in rows:
     if not url: continue
 
     episode_id = url.split("/")[-1]
-    driver.get(url)
-    time.sleep(2)  # テスト用に短縮した待機時間
-
+    row_number = idx + 2  # ヘッダー分を考慮したスプレッドシート上の行番号
+    
     try:
+        driver.get(url)
+        time.sleep(3)
+        
+        # ページが存在しない場合の判定
+        if "404" in driver.title or "ページが見つかりません" in driver.page_source:
+            raise Exception("Page Not Found")
+
+        # あとでみる数取得
         elem = driver.find_element(By.XPATH, "//*[@aria-label='あとでみる']")
         parent = elem.find_element(By.XPATH, "..")
-        text = parent.text
-        numbers = re.findall(r'[\d.,万]+', text)
+        numbers = re.findall(r'[\d.,万]+', parent.text)
         
-        if numbers:
-            like_raw = numbers[0]
-            if "万" in like_raw:
-                like = int(float(like_raw.replace("万", "")) * 10000)
-            else:
-                like = int(like_raw.replace(",", ""))
-        else:
-            like = 0
-    except Exception as e:
-        print(f"取得失敗: {episode_id}, {e}")
-        like = 0
+        like = int(float(numbers[0].replace("万", "")) * 10000) if "万" in numbers[0] else int(numbers[0].replace(",", ""))
+        
+        # 成功時はlike_dataに記録
+        now = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")
+        like_sheet.append_row([now, episode_id, like])
+        print(f"取得成功: {episode_id} = {like}")
 
-    now = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")
-    like_sheet.append_row([now, episode_id, like])
+    except Exception as e:
+        print(f"エラー発生: {episode_id}, {e}")
+        # ①②: エラーなら active を FALSE にし、end_date(F列)とactual_end_date(H列)を更新
+        today = datetime.now(JST).strftime("%Y-%m-%d")
+        url_sheet.update_cell(row_number, 6, "FALSE") # F列: active
+        url_sheet.update_cell(row_number, 7, today)    # G列: end_date
+        url_sheet.update_cell(row_number, 8, today)    # H列: actual_end_date
 
 driver.quit()
