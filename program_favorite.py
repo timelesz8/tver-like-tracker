@@ -11,7 +11,6 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 # 1. 設定と認証
-# 環境変数から読み込む形式（これが一番GitHub Actionsで標準的です）
 service_account_info = json.loads(os.environ["GCP_SA_KEY"])
 spreadsheet_id = os.environ["TVER_DATA_SHEET_ID"]
 JST = timezone(timedelta(hours=+9), 'JST')
@@ -25,10 +24,13 @@ spreadsheet = client.open_by_key(spreadsheet_id)
 program_sheet = spreadsheet.worksheet("program_master")
 fav_sheet = spreadsheet.worksheet("favorite_data")
 
-# 2. ブラウザ設定
+# 2. ブラウザ設定（人間っぽさを強化）
 chrome_options = Options()
 chrome_options.add_argument("--headless=new")
 chrome_options.add_argument("--no-sandbox")
+chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+chrome_options.add_experimental_option('useAutomationExtension', False)
 chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
 driver = webdriver.Chrome(options=chrome_options)
 
@@ -51,10 +53,10 @@ for idx, row in enumerate(rows):
     
     try:
         driver.get(url)
-        time.sleep(5) 
+        time.sleep(7) # 少し長めに待機
         
         xpath_query = "//*[contains(@aria-label, 'お気に入り')]"
-        element = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, xpath_query)))
+        element = WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.XPATH, xpath_query)))
         
         raw_text = element.get_attribute("aria-label")
         count = parse_favorite_count(raw_text)
@@ -64,6 +66,10 @@ for idx, row in enumerate(rows):
         print(f"取得成功: {program_id} = {count}")
         
     except Exception as e:
-        print(f"エラー発生: {program_id}, {e}")
+        # スクリーンショットを保存（GitHub Actionsのログと一緒に確認可能にする）
+        screenshot_name = f"error_{program_id}.png"
+        driver.save_screenshot(screenshot_name)
+        print(f"エラー発生: {program_id}, 型: {type(e).__name__}, メッセージ: {str(e)}")
+        print(f"スクリーンショットを保存しました: {screenshot_name}")
 
 driver.quit()
