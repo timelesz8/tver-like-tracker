@@ -66,9 +66,9 @@ for idx, row in enumerate(rows):
     except Exception as e:
         print(f"エラー発生: {episode_id}, {e}")
         # 列の移動に合わせて修正
-        # active(O列) = 15列目, end_date(Q列) = 17列目, days_active(R列) = 18列目
+        # active(O列) = 14列目, end_date(Q列) = 16列目, days_active(Q列) = 17列目
         today = datetime.now(JST).strftime("%Y-%m-%d")
-        url_sheet.update_cell(row_number, 15, "FALSE") # O列: active
+        url_sheet.update_cell(row_number, 14, "FALSE") # O列: active
         url_sheet.update_cell(row_number, 16, today)    # Q列: end_date
         # R列(days_active)はスプレッドシートの関数が自動計算するため更新不要
         print(f"ステータスを更新しました (行: {row_number})")
