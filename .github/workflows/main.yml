@@ -5,8 +5,9 @@ on:
     branches:
       - main
   schedule:
-    # 日本時間の毎時00分実行（UTCの毎時15分）
-    - cron: "15 * * * *"
+    # 毎時05分と25分に実行（2回のチャンス）
+    - cron: "5 * * * *"
+    - cron: "25 * * * *"
   workflow_dispatch:
 
 jobs:
@@ -15,27 +16,16 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-
       - name: Setup Chrome
         uses: browser-actions/setup-chrome@latest
-        
       - name: Install dependencies
         run: |
           pip install --upgrade pip
           pip install gspread oauth2client selenium==4.18.1
-
-      # program_favorite.py はエラーが出るため、一旦ここをコメントアウトまたは削除します
-      # - name: Run favorite script
-      #   env:
-      #     GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
-      #     TVER_DATA_SHEET_ID: ${{ secrets.TVER_DATA_SHEET_ID }}
-      #   run: python program_favorite.py
-
       - name: Run original script
         env:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
