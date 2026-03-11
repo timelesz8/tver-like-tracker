@@ -23,6 +23,28 @@ spreadsheet = client.open_by_key(spreadsheet_id)
 url_sheet = spreadsheet.worksheet("episode_master")
 like_sheet = spreadsheet.worksheet("like_data")
 
+# --- 重複防止チェック (30分ルール) ---
+def is_already_fetched_this_hour(sheet):
+    try:
+        data = sheet.get_all_values()
+        if len(data) < 2: return False
+        last_time_str = data[-1][0]
+        last_time = datetime.strptime(last_time_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=JST)
+        now = datetime.now(JST)
+        # 30分以内に記録があればスキップ
+        if now - last_time < timedelta(minutes=30):
+            return True
+    except Exception as e:
+        print(f"チェックエラー: {e}")
+    return False
+
+if is_already_fetched_this_hour(like_sheet):
+    print("直近30分以内に実行済みのためスキップします。")
+    exit()
+# ---------------------------------
+
+
+
 # 2. ブラウザ設定
 chrome_options = Options()
 chrome_options.add_argument("--headless=new")
