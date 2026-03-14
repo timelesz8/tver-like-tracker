@@ -53,11 +53,18 @@ for idx, row in enumerate(rows):
         # お気に入りボタンが含まれる要素を特定
         # 画面上の「お気に入り登録」などのラベルを持つ要素を探す
         wait = WebDriverWait(driver, 15)
-        elem = wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(@aria-label, 'お気に入り')]")))
+        
+        # 20260314 tsunakan エリアラベル指定からCSSセレクタクラス名前方一致に切り替え
+        # 念のため元コード残します
+        # elem = wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(@aria-label, 'お気に入り')]")))
+        elem = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "[class^='FavoriteButton_count']")))
         
         # episode_like.py と同様に親要素経由でテキストを取得して正規化
-        parent = elem.find_element(By.XPATH, "..")
-        text = parent.text
+        # parent = elem.find_element(By.XPATH, "..")
+        # text = parent.text
+        
+        # 20260314 tsunakan エリアラベル指定からCSSセレクタクラス名前方一致に切り替え
+        text = elem.text
         
         # 数値抽出（例: 3.5万 -> 35000）
         numbers = re.findall(r'[\d.,万]+', text)
