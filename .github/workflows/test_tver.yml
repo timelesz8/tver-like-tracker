@@ -1,32 +1,25 @@
-name: TVerテスト
+name: program_favorite_test
 
 on:
   workflow_dispatch:
 
 jobs:
-
-  program-favorite:
+  run-script:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
-      - name: Setup Chrome
-        uses: browser-actions/setup-chrome@v1
+      - uses: browser-actions/setup-chrome@v1
 
-      - name: Install dependencies
-        run: |
-          pip install selenium gspread google-auth
+      - run: pip install selenium gspread google-auth
 
       - name: Run program_favorite
         env:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
           TVER_DATA_SHEET_ID: ${{ secrets.TVER_DATA_SHEET_ID }}
-        run: |
-          python program_favorite.py
+        run: python program_favorite.py
