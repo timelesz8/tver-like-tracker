@@ -3,6 +3,7 @@ import json
 import requests
 from datetime import datetime
 from google.cloud import bigquery
+import io
 
 # --- 設定項目 ---
 PROJECT_ID = 'tver-data'
@@ -11,7 +12,7 @@ TABLE_ID = 'episode_like_logs'
 LOCATION = 'asia-northeast1'
 
 def get_tver_like(episode_id):
-    # 既存の取得ロジックをここに維持してください
+    # ここに元の取得ロジックを入れてください
     return 200
 
 def upload_to_bigquery(data_list):
@@ -19,33 +20,26 @@ def upload_to_bigquery(data_list):
         return
 
     key_info = json.loads(os.environ.get('GCP_SA_KEY'))
-    
-    # 【ここを修正】クライアントを作る段階でロケーションを指定します
     client = bigquery.Client.from_service_account_info(key_info, project=PROJECT_ID, location=LOCATION)
-    
-    table_full_id = f"{PROJECT_ID}.{DATASET_ID}.{TABLE_ID}"
-    
-    # location引数を削除しました
-    errors = client.insert_rows_json(table_full_id, data_list)
-    
-    if errors == []:
-        print(f"Success: BigQuery({TABLE_ID}) への書き込み完了！")
-    else:
-        for error in errors:
-            print(f"Detailed BigQuery Error: {error}")
+    table_ref = client.dataset(DATASET_ID).table(TABLE_ID)
+
+    # ロード形式（JSONL）に変換
+    json_data = "\n".join([json.dumps(d) for d in data_list])
+    file_obj = io.StringIO(json_data)
+
+    job_config = bigquery.LoadJobConfig(
+        source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
+        autodetect=True,
+        write_disposition="WRITE_APPEND",
+    )
+
+    try:
+        load_job = client.load_table_from_file(file_obj, table_ref, job_config=job_config)
+        load_job.result()
+        print(f"Success: BigQuery({TABLE_ID}) へのロード完了！")
+    except Exception as e:
+        print(f"Error: {e}")
 
 if __name__ == "__main__":
-    target_episodes = ["sr1bzatukq"]
-    results_for_bq = []
-    now = datetime.now().isoformat()
-
-    for eid in target_episodes:
-        count = get_tver_like(eid)
-        results_for_bq.append({
-            "observed_at": now,
-            "episode_id": eid,
-            "like_count": count
-        })
-
-    if results_for_bq:
-        upload_to_bigquery(results_for_bq)
+    # ここにエピソードIDのリストなどを入れて実行
+    pass
