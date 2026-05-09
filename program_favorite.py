@@ -8,11 +8,11 @@ from google.cloud import bigquery
 PROJECT_ID = 'tver-data'
 DATASET_ID = 'tver_raw_data'
 TABLE_ID = 'favorite_logs'
-LOCATION = 'asia-northeast1' # ← 東京に設定している場合はここが必要
+LOCATION = 'asia-northeast1'
 
 def get_tver_favorite(program_id):
-    # 本来の取得ロジック（そのまま維持してください）
-    return 0 
+    # 既存の取得ロジックをここに維持してください
+    return 100 
 
 def upload_to_bigquery(data_list):
     if not os.environ.get('GCP_SA_KEY'):
@@ -20,16 +20,18 @@ def upload_to_bigquery(data_list):
         return
 
     key_info = json.loads(os.environ.get('GCP_SA_KEY'))
-    client = bigquery.Client.from_service_account_info(key_info)
+    
+    # 【ここを修正】クライアントを作る段階でロケーションを指定します
+    client = bigquery.Client.from_service_account_info(key_info, project=PROJECT_ID, location=LOCATION)
+    
     table_full_id = f"{PROJECT_ID}.{DATASET_ID}.{TABLE_ID}"
     
-    # ロケーションを明示的に指定してデータを挿入
-    errors = client.insert_rows_json(table_full_id, data_list, location=LOCATION)
+    # location引数を削除しました
+    errors = client.insert_rows_json(table_full_id, data_list)
     
     if errors == []:
         print(f"Success: BigQuery({TABLE_ID}) への書き込み完了！")
     else:
-        # 詳細なエラーを出力するように変更
         for error in errors:
             print(f"Detailed BigQuery Error: {error}")
 
@@ -39,8 +41,7 @@ if __name__ == "__main__":
     now = datetime.now().isoformat()
 
     for pid in target_programs:
-        # ここで実際の取得処理を呼び出す
-        count = 100 # テスト用
+        count = get_tver_favorite(pid)
         results_for_bq.append({
             "observed_at": now,
             "program_id": pid,
