@@ -46,3 +46,7 @@ jobs:
           TVER_DATA_SHEET_ID: ${{ secrets.TVER_DATA_SHEET_ID }}
           GAS_WEB_APP_URL: ${{ secrets.GAS_WEB_APP_URL }}
         run: python episode_like.py
+
+        - name: Notify GAS
+        run: |
+          curl -L "${{ secrets.GAS_WEB_APP_URL }}"
