@@ -3,6 +3,7 @@ import json
 import gspread
 import time
 import re
+import requests  # 追加
 from datetime import datetime, timezone, timedelta
 from google.oauth2.service_account import Credentials
 from selenium import webdriver
@@ -14,6 +15,7 @@ from selenium.webdriver.support import expected_conditions as EC
 # 1. 設定と認証
 service_account_info = json.loads(os.environ["GCP_SA_KEY"])
 spreadsheet_id = os.environ["TVER_DATA_SHEET_ID"]
+gas_web_app_url = os.environ.get("GAS_WEB_APP_URL") # 環境変数に追加してください
 JST = timezone(timedelta(hours=+9), 'JST')
 
 creds = Credentials.from_service_account_info(
@@ -47,23 +49,11 @@ for idx, row in enumerate(rows):
     
     try:
         driver.get(url)
-        # コンテンツの描画を待つ
         time.sleep(5)
         
-        # お気に入りボタンが含まれる要素を特定
-        # 画面上の「お気に入り登録」などのラベルを持つ要素を探す
         wait = WebDriverWait(driver, 15)
-        
-        # 20260314 tsunakan エリアラベル指定からCSSセレクタクラス名前方一致に切り替え
-        # 念のため元コード残します
-        # elem = wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(@aria-label, 'お気に入り')]")))
+        # クラス名前方一致で要素取得
         elem = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "[class^='FavoriteButton_count']")))
-        
-        # episode_like.py と同様に親要素経由でテキストを取得して正規化
-        # parent = elem.find_element(By.XPATH, "..")
-        # text = parent.text
-        
-        # 20260314 tsunakan エリアラベル指定からCSSセレクタクラス名前方一致に切り替え
         text = elem.text
         
         # 数値抽出（例: 3.5万 -> 35000）
@@ -75,12 +65,21 @@ for idx, row in enumerate(rows):
         count = int(float(fav_val.replace("万", "")) * 10000) if "万" in fav_val else int(fav_val)
         
         now = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")
+        # 列の順番をBigQueryのスキーマ(observed_at, program_id, favorite_count)に合わせる
         fav_sheet.append_row([now, program_id, count])
         print(f"取得成功: {program_id} = {count}")
         
     except Exception as e:
-        # デバッグ用にスクリーンショットを保存
         driver.save_screenshot(f"error_{program_id}.png")
         print(f"エラー発生: {program_id}, {e}")
 
 driver.quit()
+
+# 4. GASへBigQuery転送の通知を送る (追加)
+if gas_web_app_url:
+    try:
+        # doPost または doGet に合わせてリクエストを送る
+        response = requests.post(gas_web_app_url, json={"action": "export_all"})
+        print(f"GAS通知完了: {response.status_code}")
+    except Exception as e:
+        print(f"GAS通知エラー: {e}")
