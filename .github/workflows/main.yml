@@ -30,7 +30,6 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          # requests を追加しました
           pip install gspread oauth2client selenium==4.18.1 requests
 
       - name: Run Program Favorite Tracker
@@ -47,6 +46,6 @@ jobs:
           GAS_WEB_APP_URL: ${{ secrets.GAS_WEB_APP_URL }}
         run: python episode_like.py
 
-        - name: Notify GAS
+      - name: Notify GAS
         run: |
           curl -L "${{ secrets.GAS_WEB_APP_URL }}"
