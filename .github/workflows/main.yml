@@ -1,15 +1,14 @@
-name: TVerエピソードいいねデータ収集実行
+name: TVerデータ収集（番組お気に入り＆エピソードいいね）実行
 
 on:
   repository_dispatch:
-    types: [gas_trigger]  # これを追加
-  workflow_dispatch:      # 手動実行ボタンも残しておくと便利
-  
+    types: [gas_trigger]
+  workflow_dispatch:      
   push:
     branches:
       - main
   schedule:
-    # 毎時05分と25分に実行（2回のチャンス）
+    # 毎時05分と25分に実行
     - cron: "5 * * * *"
     - cron: "25 * * * *"
 
@@ -19,18 +18,31 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
+
       - name: Setup Chrome
         uses: browser-actions/setup-chrome@latest
+
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install gspread oauth2client selenium==4.18.1
-      - name: Run original script
+          # requests を追加しました
+          pip install gspread oauth2client selenium==4.18.1 requests
+
+      - name: Run Program Favorite Tracker
         env:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
           TVER_DATA_SHEET_ID: ${{ secrets.TVER_DATA_SHEET_ID }}
+          GAS_WEB_APP_URL: ${{ secrets.GAS_WEB_APP_URL }}
+        run: python program_favorite.py
+
+      - name: Run Episode Like Tracker
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+          TVER_DATA_SHEET_ID: ${{ secrets.TVER_DATA_SHEET_ID }}
+          GAS_WEB_APP_URL: ${{ secrets.GAS_WEB_APP_URL }}
         run: python episode_like.py
