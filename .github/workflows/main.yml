@@ -35,8 +35,8 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install gspread oauth2client selenium==4.18.1 requests
-
+          pip install gspread oauth2client selenium==4.18.1 requests google-cloud-bigquery
+          
       - name: Run Program Favorite Tracker
         run: python program_favorite.py
 
