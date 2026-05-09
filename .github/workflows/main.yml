@@ -1,6 +1,10 @@
-name: TVerデータ収集実行
+name: TVerエピソードいいねデータ収集実行
 
 on:
+  repository_dispatch:
+    types: [gas_trigger]  # これを追加
+  workflow_dispatch:      # 手動実行ボタンも残しておくと便利
+  
   push:
     branches:
       - main
