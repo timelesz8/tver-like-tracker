@@ -18,7 +18,7 @@ jobs:
     env:
       GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
       TVER_DATA_SHEET_ID: ${{ secrets.TVER_DATA_SHEET_ID }}
-      GAS_WEB_APP_URL: ${{ secrets.GAS_WEB_APP_URL }}
+      GAS_WEB_APP_URL: ${{ secrets.GAS_WEBAPP_URL }}
     
     steps:
       - name: Checkout code
