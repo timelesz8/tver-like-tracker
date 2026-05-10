@@ -1,90 +1,35 @@
-import os
-import json
-import time
-import io
-# timezone と timedelta を使えるように追加
-from datetime import datetime, timedelta, timezone 
-from google.cloud import bigquery
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+name: TVerデータ収集（番組お気に入り＆エピソードいいね）実行
 
-# --- 設定項目 ---
-PROJECT_ID = 'tver-data'
-DATASET_ID = 'tver_raw_data'
-TABLE_ID = 'episode_like_logs'
-LOCATION = 'asia-northeast1'
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 * * * *' # 1時間に1回実行
 
-def setup_driver():
-    chrome_options = Options()
-    chrome_options.add_argument('--headless')
-    chrome_options.add_argument('--no-sandbox')
-    chrome_options.add_argument('--disable-dev-shm-usage')
-    return webdriver.Chrome(options=chrome_options)
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-def get_tver_like_selenium(driver, episode_id):
-    url = f"https://tver.jp/episodes/{episode_id}"
-    try:
-        driver.get(url)
-        # クラス名に ActionButton_number を含む要素が数字を表示するまで待機
-        wait = WebDriverWait(driver, 15)
-        element = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '[class*="ActionButton_number"]')))
-        
-        like_text = element.text.replace(',', '')
-        return int(like_text) if like_text.isdigit() else 0
-    except Exception as e:
-        print(f"Error fetching {episode_id}: {e}")
-        return None
+      - name: Set up Python
+        uses: actions/checkout@v5
+        with:
+          python-version: '3.10'
 
-def upload_to_bigquery(data_list):
-    if not os.environ.get('GCP_SA_KEY'):
-        print("GCP_SA_KEY is missing.")
-        return
-    key_info = json.loads(os.environ.get('GCP_SA_KEY'))
-    client = bigquery.Client.from_service_account_info(key_info, project=PROJECT_ID, location=LOCATION)
-    table_ref = client.dataset(DATASET_ID).table(TABLE_ID)
+      - name: Set up Chrome
+        uses: browser-actions/setup-chrome@v1
 
-    json_data = "\n".join([json.dumps(d) for d in data_list])
-    file_obj = io.StringIO(json_data)
-    job_config = bigquery.LoadJobConfig(
-        source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
-        autodetect=True,
-        write_disposition="WRITE_APPEND",
-    )
-    try:
-        client.load_table_from_file(file_obj, table_ref, job_config=job_config).result()
-        print(f"Success: {len(data_list)} rows uploaded to BigQuery.")
-    except Exception as e:
-        print(f"BigQuery Upload Error: {e}")
+      - name: Install dependencies
+        run: |
+          pip install google-cloud-bigquery selenium requests
 
-if __name__ == "__main__":
-    # 日本時間 (JST) の設定
-    jst = timezone(timedelta(hours=9))
-    now = datetime.now(jst).isoformat()
-    
-    # 取得対象のエピソードID（ここにテストしたいIDを入れてください）
-    target_ids = ["epabcdefg123", "ephijklmn456"]
+      - name: Run Program Favorite Tracker
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+        run: python program_favorite.py
 
-    driver = setup_driver()
-    results = []
-    
-    try:
-        for eid in target_ids:
-            print(f"Starting: {eid}")
-            count = get_tver_like_selenium(driver, eid)
-            if count is not None:
-                results.append({
-                    "episode_id": eid,
-                    "like_count": int(count),
-                    "observed_at": now
-                })
-            time.sleep(3)
-    finally:
-        driver.quit()
-
-    if results:
-        upload_to_bigquery(results)
-    else:
-        print("No data collected.")
+      - name: Run Episode Like Tracker
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+        run: python episode_like.py
