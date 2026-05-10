@@ -87,18 +87,18 @@ except Exception as e:
 
 
 try:
-    like_sheet = spreadsheet.worksheet("episode_like_data")
-    logger.info("episode_like_data シート接続OK")
+    like_sheet = spreadsheet.worksheet("like_data")
+    logger.info("elike_data シート接続OK")
 
 except Exception:
-    logger.warning("episode_like_data シートが無いので作成します")
+    logger.warning("like_data シートが無いので作成します")
     like_sheet = spreadsheet.add_worksheet(
-        title="episode_like_data",
+        title="like_data",
         rows="1000",
         cols="10",
     )
     like_sheet.append_row(["datetime", "episode_id", "like_count"])
-    logger.info("episode_like_data シート作成OK")
+    logger.info("like_data シート作成OK")
 
 
 # =========================
