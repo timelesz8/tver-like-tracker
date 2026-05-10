@@ -1,11 +1,11 @@
 name: TVerデータ収集（お気に入り＆いいね）実行
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # GitHub画面からの手動実行用
   repository_dispatch:
-    types: [gas_trigger]
+    types: [gas_trigger] # GASからのキック受信用
   schedule:
-    - cron: '0 * * * *'
+    - cron: '0 * * * *' # 予備の定期実行（1時間に1回）
 
 jobs:
   run-scripts:
@@ -24,7 +24,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install google-cloud-bigquery selenium requests
+          pip install google-cloud-bigquery selenium requests pandas
 
       - name: 番組お気に入り数を取得してBQへ
         env:
