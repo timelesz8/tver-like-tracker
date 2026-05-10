@@ -83,9 +83,10 @@ for idx, row in enumerate(rows):
 
         # 「いいね」ボタンの要素を特定（TVerの仕様に合わせたクラス名）
         # ※クラス名は時期により変わる可能性があるため、前方一致で取得
+        # 「aria-labelに 'いいね' を含むボタン」の中にある「IconButton_labelで始まるクラス」を指定
         elem = wait.until(
             EC.presence_of_element_located(
-                (By.CSS_SELECTOR, "[class^='LikeButton_count']")
+                (By.CSS_SELECTOR, "button[aria-label*='いいね'] [class^='IconButton_label']")
             )
         )
 
