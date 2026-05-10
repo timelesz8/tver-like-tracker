@@ -2,8 +2,8 @@ import os
 import json
 import time
 import io
-import gspread
 from datetime import datetime, timedelta, timezone
+from googleapiclient.discovery import build
 from google.cloud import bigquery
 from google.oauth2.service_account import Credentials
 from selenium import webdriver
@@ -31,7 +31,6 @@ def get_tver_like_selenium(driver, episode_id):
     try:
         driver.get(url)
         wait = WebDriverWait(driver, 15)
-        # 「いいね」の数字が表示されるまで待機
         element = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '[class*="ActionButton_number"]')))
         like_text = element.text.replace(',', '')
         return int(like_text) if like_text.isdigit() else 0
@@ -57,26 +56,38 @@ if __name__ == "__main__":
     now = datetime.now(jst).isoformat()
 
     try:
-        scope = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
+        # 一昨日の認証・読み込みロジック
         key_info = json.loads(os.environ.get('GCP_SA_KEY'))
-        creds = Credentials.from_service_account_info(key_info, scopes=scope)
-        client = gspread.authorize(creds)
+        creds = Credentials.from_service_account_info(key_info)
+        service = build('sheets', 'v4', credentials=creds)
+        sheet = service.spreadsheets()
         
-        sheet = client.open_by_key(SPREADSHEET_ID).worksheet("episode_master")
-        all_values = sheet.get_all_values()
+        result = sheet.values().get(spreadsheetId=SPREADSHEET_ID, range='episode_master!A:N').execute()
+        values = result.get('values', [])
         
-        target_ids = []
-        if len(all_values) > 1:
-            # 2行目以降を1行ずつチェック
-            for row in all_values[1:]:
-                # A列(row[0]) と N列(row[13]) を直接指定
-                if len(row) > 13:
-                    eid = str(row[0]).strip()
-                    active_val = str(row[13]).strip().upper()
-                    if active_val == 'TRUE' and eid:
-                        target_ids.append(eid)
-        
-        print(f"DEBUG: Found {len(target_ids)} active episodes.")
+        if not values:
+            print("No data found in sheet.")
+            target_ids = []
+        else:
+            header = values[0]
+            # 列のインデックスを特定
+            try:
+                id_idx = header.index('episode_id')
+                active_idx = header.index('active')
+                
+                target_ids = []
+                for row in values[1:]:
+                    if len(row) > active_idx:
+                        eid = row[id_idx].strip()
+                        is_active = row[active_idx].strip().upper() == 'TRUE'
+                        if is_active and eid:
+                            target_ids.append(eid)
+            except ValueError as e:
+                print(f"Column not found: {e}")
+                target_ids = []
+
+        print(f"Target IDs found: {target_ids}")
+
     except Exception as e:
         print(f"Sheet Read Error: {e}")
         target_ids = []
@@ -94,7 +105,7 @@ if __name__ == "__main__":
                         "episode_id": eid, 
                         "like_count": int(count)
                     })
-                time.sleep(3) # サーバー負荷軽減のため
+                time.sleep(3)
         finally:
             driver.quit()
 
@@ -102,4 +113,4 @@ if __name__ == "__main__":
             upload_to_bigquery(results)
             print(f"Success: {len(results)} rows uploaded to BigQuery.")
     else:
-        print("No active episodes found. Please check A列 and N列.")
+        print("No active episodes to process.")
