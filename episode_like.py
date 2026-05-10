@@ -162,7 +162,7 @@ try:
             )
             continue
 
-        url = row.get("番組URL", "")
+        url = row.get("url", "")
 
         if not url:
             skipped_no_url_count += 1
