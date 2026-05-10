@@ -31,6 +31,7 @@ def get_tver_like_selenium(driver, episode_id):
     try:
         driver.get(url)
         wait = WebDriverWait(driver, 15)
+        # 「いいね」の数字が表示されるまで待機
         element = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '[class*="ActionButton_number"]')))
         like_text = element.text.replace(',', '')
         return int(like_text) if like_text.isdigit() else 0
@@ -39,9 +40,6 @@ def get_tver_like_selenium(driver, episode_id):
         return None
 
 def upload_to_bigquery(data_list):
-    if not os.environ.get('GCP_SA_KEY'):
-        print("Error: GCP_SA_KEY is missing")
-        return
     key_info = json.loads(os.environ.get('GCP_SA_KEY'))
     client = bigquery.Client.from_service_account_info(key_info, project=PROJECT_ID, location=LOCATION)
     table_ref = client.dataset(DATASET_ID).table(TABLE_ID)
@@ -65,26 +63,20 @@ if __name__ == "__main__":
         client = gspread.authorize(creds)
         
         sheet = client.open_by_key(SPREADSHEET_ID).worksheet("episode_master")
-        
-        # 列名指定ではなく「全セルの値」をそのまま取得する方式に変更
         all_values = sheet.get_all_values()
-        print(f"DEBUG: Total rows found in sheet: {len(all_values)}")
-
+        
         target_ids = []
         if len(all_values) > 1:
-            # 2行目から順番にチェック
+            # 2行目以降を1行ずつチェック
             for row in all_values[1:]:
-                # row[0]はA列(episode_id), row[13]はN列(active)
-                # インデックス範囲内かチェック
+                # A列(row[0]) と N列(row[13]) を直接指定
                 if len(row) > 13:
                     eid = str(row[0]).strip()
                     active_val = str(row[13]).strip().upper()
-                    
                     if active_val == 'TRUE' and eid:
                         target_ids.append(eid)
         
-        print(f"Target IDs found: {target_ids}")
-        
+        print(f"DEBUG: Found {len(target_ids)} active episodes.")
     except Exception as e:
         print(f"Sheet Read Error: {e}")
         target_ids = []
@@ -102,7 +94,7 @@ if __name__ == "__main__":
                         "episode_id": eid, 
                         "like_count": int(count)
                     })
-                time.sleep(3)
+                time.sleep(3) # サーバー負荷軽減のため
         finally:
             driver.quit()
 
@@ -110,4 +102,4 @@ if __name__ == "__main__":
             upload_to_bigquery(results)
             print(f"Success: {len(results)} rows uploaded to BigQuery.")
     else:
-        print("No active episodes found. Please check A列(episode_id) and N列(active).")
+        print("No active episodes found. Please check A列 and N列.")
