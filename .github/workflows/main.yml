@@ -1,11 +1,11 @@
 name: TVerデータ収集（お気に入り＆いいね）実行
 
 on:
-  workflow_dispatch: # GitHub画面からの手動実行用
+  workflow_dispatch: # 手動実行用
   repository_dispatch:
-    types: [gas_trigger] # GASからのキック受信用
+    types: [gas_trigger] # GASからのキック用
   schedule:
-    - cron: '0 * * * *' # 予備の定期実行（1時間に1回）
+    - cron: '0 * * * *' # 予備の1時間おき実行
 
 jobs:
   run-scripts:
@@ -26,12 +26,12 @@ jobs:
         run: |
           pip install google-cloud-bigquery selenium requests pandas
 
-      - name: 番組お気に入り数を取得してBQへ
+      - name: 番組お気に入り数を取得
         env:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
         run: python program_favorite.py
 
-      - name: エピソードいいね数を取得してBQへ
+      - name: エピソードいいね数を取得
         env:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
         run: python episode_like.py
