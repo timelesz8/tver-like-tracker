@@ -15,24 +15,19 @@ JST = timezone(timedelta(hours=+9), 'JST')
 
 creds = Credentials.from_service_account_info(
 service_account_info,
-    scopes=[
+scopes=[
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive"
     ]
-    scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
 )
 
 client = gspread.authorize(creds)
 
-spreadsheet = client.open_by_key(SPREADSHEET_ID)
-
 # =========================
 # シート取得
 # =========================
-
-spreadsheet = client.open_by_key(spreadsheet_id)
+spreadsheet = client.open_by_key(TVER_DATA_SHEET_ID)
 program_sheet = spreadsheet.worksheet("program_master")
-fav_sheet = spreadsheet.worksheet("favorite_data")
 
 try:
     fav_sheet = spreadsheet.worksheet("favorite_data")
@@ -42,6 +37,8 @@ except:
     fav_sheet.append_row(["datetime", "program_id", "favorite_count"])
 
 print("シート接続OK")
+
+    
 
 # =========================
 # 2. ブラウザ設定
