@@ -39,9 +39,13 @@ def get_tver_like_selenium(driver, episode_id):
         return None
 
 def upload_to_bigquery(data_list):
+    if not os.environ.get('GCP_SA_KEY'):
+        print("Error: GCP_SA_KEY is missing")
+        return
     key_info = json.loads(os.environ.get('GCP_SA_KEY'))
     client = bigquery.Client.from_service_account_info(key_info, project=PROJECT_ID, location=LOCATION)
     table_ref = client.dataset(DATASET_ID).table(TABLE_ID)
+    
     json_data = "\n".join([json.dumps(d) for d in data_list])
     file_obj = io.StringIO(json_data)
     job_config = bigquery.LoadJobConfig(
@@ -56,12 +60,13 @@ if __name__ == "__main__":
     now = datetime.now(jst).isoformat()
 
     try:
-        # 一昨日の認証・読み込みロジック
+        # --- 一昨日の安定した読み込みロジック ---
         key_info = json.loads(os.environ.get('GCP_SA_KEY'))
         creds = Credentials.from_service_account_info(key_info)
         service = build('sheets', 'v4', credentials=creds)
         sheet = service.spreadsheets()
         
+        # episode_masterシートのA列からN列まで取得
         result = sheet.values().get(spreadsheetId=SPREADSHEET_ID, range='episode_master!A:N').execute()
         values = result.get('values', [])
         
@@ -70,7 +75,7 @@ if __name__ == "__main__":
             target_ids = []
         else:
             header = values[0]
-            # 列のインデックスを特定
+            # 列名からインデックスを探す (一昨日の方式)
             try:
                 id_idx = header.index('episode_id')
                 active_idx = header.index('active')
@@ -79,19 +84,21 @@ if __name__ == "__main__":
                 for row in values[1:]:
                     if len(row) > active_idx:
                         eid = row[id_idx].strip()
+                        # TRUE判定 (一昨日のロジック)
                         is_active = row[active_idx].strip().upper() == 'TRUE'
                         if is_active and eid:
                             target_ids.append(eid)
             except ValueError as e:
-                print(f"Column not found: {e}")
+                print(f"Required columns not found: {e}")
                 target_ids = []
 
-        print(f"Target IDs found: {target_ids}")
+        print(f"Target IDs identified: {target_ids}")
 
     except Exception as e:
         print(f"Sheet Read Error: {e}")
         target_ids = []
 
+    # --- 取得と保存 ---
     if target_ids:
         driver = setup_driver()
         results = []
@@ -113,4 +120,4 @@ if __name__ == "__main__":
             upload_to_bigquery(results)
             print(f"Success: {len(results)} rows uploaded to BigQuery.")
     else:
-        print("No active episodes to process.")
+        print("No active episodes to process. Check your sheet.")
