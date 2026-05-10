@@ -33,14 +33,14 @@ client = gspread.authorize(creds)
 
 spreadsheet = client.open_by_key(SPREADSHEET_ID)
 # エピソードいいね用のマスタシート（もし別名なら書き換えてください）
-program_sheet = spreadsheet.worksheet("program_master")
+episode_sheet = spreadsheet.worksheet("episode_master")
 
 try:
     like_sheet = spreadsheet.worksheet("episode_like_data")
 except:
     print("episode_like_data シートが無いので作成します")
     like_sheet = spreadsheet.add_worksheet(title="episode_like_data", rows="1000", cols="10")
-    like_sheet.append_row(["datetime", "program_id", "like_count"])
+    like_sheet.append_row(["datetime", "episode_id", "like_count"])
 
 print("シート接続OK")
 
@@ -61,7 +61,7 @@ driver = webdriver.Chrome(options=chrome_options)
 # 3. メイン処理
 # =========================
 
-rows = program_sheet.get_all_records()
+rows = episode_sheet.get_all_records()
 
 for idx, row in enumerate(rows):
     if str(row.get("active", "")).upper() != "TRUE":
@@ -71,10 +71,10 @@ for idx, row in enumerate(rows):
     if not url:
         continue
 
-    program_id = url.split("/")[-1]
+    episode_id = url.split("/")[-1]
 
     try:
-        print(f"処理開始: {program_id}")
+        print(f"処理開始: {episode_id}")
         driver.get(url)
 
         # 読み込み待機
@@ -106,12 +106,12 @@ for idx, row in enumerate(rows):
         now = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")
         
         # 書き込み
-        like_sheet.append_row([now, program_id, count])
-        print(f"取得成功: {program_id} = {count}")
+        like_sheet.append_row([now, episode_id, count])
+        print(f"取得成功: {episode_id} = {count}")
 
     except Exception as e:
-        driver.save_screenshot(f"error_like_{program_id}.png")
-        print(f"エラー発生: {program_id}, {e}")
+        driver.save_screenshot(f"error_like_{episode_id}.png")
+        print(f"エラー発生: {episode_id}, {e}")
 
 driver.quit()
 print("全処理終了")
