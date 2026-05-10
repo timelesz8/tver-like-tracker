@@ -1,19 +1,19 @@
-name: TVerデータ収集（番組お気に入り＆エピソードいいね）実行
+name: TVerデータ収集（お気に入り＆いいね）
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 * * * *' # 1時間に1回実行
+    - cron: '0 * * * *' # 1時間に1回自動実行
 
 jobs:
-  run-script:
+  run-all-scripts:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/checkout@v5
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
@@ -24,12 +24,12 @@ jobs:
         run: |
           pip install google-cloud-bigquery selenium requests
 
-      - name: Run Program Favorite Tracker
+      - name: お気に入り数を取得して書き込む
         env:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
         run: python program_favorite.py
 
-      - name: Run Episode Like Tracker
+      - name: いいね数を取得して書き込む
         env:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
         run: python episode_like.py
