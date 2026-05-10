@@ -1,19 +1,78 @@
+import os
+import json
+import time
+import io
+# timezone と timedelta を使えるように追加
+from datetime import datetime, timedelta, timezone 
+from google.cloud import bigquery
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+# --- 設定項目 ---
+PROJECT_ID = 'tver-data'
+DATASET_ID = 'tver_raw_data'
+TABLE_ID = 'episode_like_logs'
+LOCATION = 'asia-northeast1'
+
+def setup_driver():
+    chrome_options = Options()
+    chrome_options.add_argument('--headless')
+    chrome_options.add_argument('--no-sandbox')
+    chrome_options.add_argument('--disable-dev-shm-usage')
+    return webdriver.Chrome(options=chrome_options)
+
+def get_tver_like_selenium(driver, episode_id):
+    url = f"https://tver.jp/episodes/{episode_id}"
+    try:
+        driver.get(url)
+        # クラス名に ActionButton_number を含む要素が数字を表示するまで待機
+        wait = WebDriverWait(driver, 15)
+        element = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '[class*="ActionButton_number"]')))
+        
+        like_text = element.text.replace(',', '')
+        return int(like_text) if like_text.isdigit() else 0
+    except Exception as e:
+        print(f"Error fetching {episode_id}: {e}")
+        return None
+
+def upload_to_bigquery(data_list):
+    if not os.environ.get('GCP_SA_KEY'):
+        print("GCP_SA_KEY is missing.")
+        return
+    key_info = json.loads(os.environ.get('GCP_SA_KEY'))
+    client = bigquery.Client.from_service_account_info(key_info, project=PROJECT_ID, location=LOCATION)
+    table_ref = client.dataset(DATASET_ID).table(TABLE_ID)
+
+    json_data = "\n".join([json.dumps(d) for d in data_list])
+    file_obj = io.StringIO(json_data)
+    job_config = bigquery.LoadJobConfig(
+        source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
+        autodetect=True,
+        write_disposition="WRITE_APPEND",
+    )
+    try:
+        client.load_table_from_file(file_obj, table_ref, job_config=job_config).result()
+        print(f"Success: {len(data_list)} rows uploaded to BigQuery.")
+    except Exception as e:
+        print(f"BigQuery Upload Error: {e}")
+
 if __name__ == "__main__":
-    # 1. 日本時間での現在時刻を取得
+    # 日本時間 (JST) の設定
     jst = timezone(timedelta(hours=9))
     now = datetime.now(jst).isoformat()
     
-    # 2. 取得対象のエピソードIDリスト
-    # 本来はここでマスターデータ等からIDを取得するようにします
-    target_ids = ["epXXXXXXXX", "epYYYYYYYY"] 
+    # 取得対象のエピソードID（ここにテストしたいIDを入れてください）
+    target_ids = ["epabcdefg123", "ephijklmn456"]
 
-    # 3. ブラウザの起動
     driver = setup_driver()
     results = []
     
     try:
         for eid in target_ids:
-            # Seleniumでいいね数を取得
+            print(f"Starting: {eid}")
             count = get_tver_like_selenium(driver, eid)
             if count is not None:
                 results.append({
@@ -21,10 +80,11 @@ if __name__ == "__main__":
                     "like_count": int(count),
                     "observed_at": now
                 })
-            time.sleep(2) # 負荷軽減
+            time.sleep(3)
     finally:
-        driver.quit() # ブラウザを確実に閉じる
+        driver.quit()
 
-    # 4. BigQueryへデータを一括ロード
     if results:
         upload_to_bigquery(results)
+    else:
+        print("No data collected.")
