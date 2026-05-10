@@ -3,7 +3,6 @@ import json
 import time
 import io
 import gspread
-import pandas as pd
 from datetime import datetime, timedelta, timezone
 from google.cloud import bigquery
 from google.oauth2.service_account import Credentials
@@ -19,7 +18,7 @@ DATASET_ID = 'tver_raw_data'
 TABLE_ID = 'episode_like_logs'
 LOCATION = 'asia-northeast1'
 
-# スプレッドシートID (URLの /d/ と /edit の間の文字列)
+# スプレッドシートID
 SPREADSHEET_ID = "1EFvUFSscwBhVhg9NtRWAnQw2pb60tVugJTjnn3vf2H8"
 
 def setup_driver():
@@ -34,6 +33,7 @@ def get_tver_like_selenium(driver, episode_id):
     try:
         driver.get(url)
         wait = WebDriverWait(driver, 15)
+        # セレクタをより汎用的なものに調整
         element = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '[class*="ActionButton_number"]')))
         like_text = element.text.replace(',', '')
         return int(like_text) if like_text.isdigit() else 0
@@ -62,32 +62,49 @@ if __name__ == "__main__":
     jst = timezone(timedelta(hours=9))
     now = datetime.now(jst).isoformat()
 
-    # 1. 認証情報を取得してログイン (一昨日の方式)
+    # 1. 認証情報を取得してログイン
     try:
         scope = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
         key_info = json.loads(os.environ.get('GCP_SA_KEY'))
         creds = Credentials.from_service_account_info(key_info, scopes=scope)
         client = gspread.authorize(creds)
         
-        # スプレッドシートを開く
+        # スプレッドシートを開く（シート名: episode_master）
+        # 前後の空白を許容しないため、正確に指定
         sheet = client.open_by_key(SPREADSHEET_ID).worksheet("episode_master")
         rows = sheet.get_all_records()
         
-        # activeがTRUEのIDを抽出 (大文字小文字問わず判定)
-        target_ids = [row['episode_id'] for row in rows if str(row.get('active', '')).upper() == 'TRUE']
-        print(f"Target IDs from authenticated sheet: {target_ids}")
+        print(f"DEBUG: Total rows found in sheet: {len(rows)}")
+
+        # --- 判定ロジックを強化 ---
+        target_ids = []
+        for row in rows:
+            # 列名 'active' と 'episode_id' が存在するか確認
+            if 'active' not in row or 'episode_id' not in row:
+                continue
+            
+            # 値を文字列に変換、空白を削除、大文字に統一
+            active_val = str(row.get('active', '')).strip().upper()
+            
+            # TRUE、またはチェックボックスがオンの場合の判定
+            if active_val in ['TRUE', 'TRUE', '1', 'CHECKED']:
+                eid = str(row.get('episode_id', '')).strip()
+                if eid:
+                    target_ids.append(eid)
+        
+        print(f"Target IDs to process: {target_ids}")
         
     except Exception as e:
         print(f"Authentication or Sheet Read Error: {e}")
         target_ids = []
 
-    # 2. スクレイピングとBigQuery書き込み (現在の方式)
+    # 2. スクレイピングとBigQuery書き込み
     if target_ids:
         driver = setup_driver()
         results = []
         try:
             for eid in target_ids:
-                print(f"Scraping: {eid}")
+                print(f"Processing: {eid}")
                 count = get_tver_like_selenium(driver, eid)
                 if count is not None:
                     results.append({
@@ -95,6 +112,7 @@ if __name__ == "__main__":
                         "episode_id": eid, 
                         "like_count": int(count)
                     })
+                # サーバー負荷軽減のための待機
                 time.sleep(3)
         finally:
             driver.quit()
@@ -102,5 +120,7 @@ if __name__ == "__main__":
         if results:
             upload_to_bigquery(results)
             print(f"Success: {len(results)} rows uploaded to BigQuery.")
+        else:
+            print("No data collected (Scraping failed for all IDs).")
     else:
-        print("No active episodes found or error occurred.")
+        print("No active episodes found. Check your 'active' column in the sheet.")
