@@ -3,21 +3,33 @@ import json
 import time
 import re
 from datetime import datetime, timedelta, timezone
-import gspread
-from google.oauth2.service_account import Credentials
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+
+# 以下のライブラリがGitHub Actions環境に必要です
+try:
+    import gspread
+    from google.oauth2.service_account import Credentials
+    from selenium import webdriver
+    from selenium.webdriver.chrome.options import Options
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
+except ImportError as e:
+    print(f"エラー: ライブラリが足りません。 {e}")
+    print("requirements.txt に gspread, google-auth, selenium が含まれているか確認してください。")
+    exit(1)
 
 # =========================
 # 1. 設定と認証
 # =========================
 
 # 環境変数から認証情報とシートIDを取得
-service_account_info = json.loads(os.environ["GCP_SA_KEY"])
-SPREADSHEET_ID = os.environ["TVER_DATA_SHEET_ID"]
+try:
+    service_account_info = json.loads(os.environ["GCP_SA_KEY"])
+    SPREADSHEET_ID = os.environ["TVER_DATA_SHEET_ID"]
+except KeyError as e:
+    print(f"エラー: 環境変数が設定されていません。 {e}")
+    exit(1)
+
 JST = timezone(timedelta(hours=+9), 'JST')
 
 # Google APIのスコープ設定
@@ -33,8 +45,12 @@ client = gspread.authorize(creds)
 # シート接続
 # =========================
 
-spreadsheet = client.open_by_key(SPREADSHEET_ID)
-program_sheet = spreadsheet.worksheet("program_master")
+try:
+    spreadsheet = client.open_by_key(SPREADSHEET_ID)
+    program_sheet = spreadsheet.worksheet("program_master")
+except Exception as e:
+    print(f"エラー: スプレッドシートへのアクセスに失敗しました。 {e}")
+    exit(1)
 
 try:
     fav_sheet = spreadsheet.worksheet("favorite_data")
