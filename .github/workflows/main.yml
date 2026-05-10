@@ -1,12 +1,14 @@
-name: TVerデータ収集（お気に入り＆いいね）
+name: TVerデータ収集（お気に入り＆いいね）実行
 
 on:
   workflow_dispatch:
+  repository_dispatch:
+    types: [gas_trigger]
   schedule:
-    - cron: '0 * * * *' # 1時間に1回自動実行
+    - cron: '0 * * * *'
 
 jobs:
-  run-all-scripts:
+  run-scripts:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -24,12 +26,12 @@ jobs:
         run: |
           pip install google-cloud-bigquery selenium requests
 
-      - name: お気に入り数を取得して書き込む
+      - name: 番組お気に入り数を取得してBQへ
         env:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
         run: python program_favorite.py
 
-      - name: いいね数を取得して書き込む
+      - name: エピソードいいね数を取得してBQへ
         env:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
         run: python episode_like.py
