@@ -24,7 +24,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install google-cloud-bigquery selenium requests pandas
+          pip install google-cloud-bigquery selenium requests pandas gspread
 
       - name: 番組お気に入り数を取得
         env:
