@@ -2,7 +2,7 @@ name: TVerデータ収集（シンプル版）
 
 on:
   schedule:
-    - cron: '0 * * * *'  # 1時間に1回自動実行（必要に応じて変更してください）
+    - cron: '0 * * * *'  # 1時間に1回自動実行
   workflow_dispatch:     # 手動実行ボタンを表示
 
 jobs:
@@ -25,14 +25,17 @@ jobs:
       - name: 必要なライブラリのインストール
         run: |
           python -m pip install --upgrade pip
-          pip install selenium webdriver-manager google-api-python-client google-auth-httplib2 google-auth-oauthlib requests
+          # gspread と google-auth を追加しました
+          pip install selenium webdriver-manager gspread google-auth google-api-python-client google-auth-httplib2 google-auth-oauthlib requests
 
       - name: 番組お気に入り数を取得
         env:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+          TVER_DATA_SHEET_ID: ${{ secrets.TVER_DATA_SHEET_ID }}
         run: python program_favorite.py
 
       - name: エピソードいいね数を取得
         env:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+          TVER_DATA_SHEET_ID: ${{ secrets.TVER_DATA_SHEET_ID }}
         run: python episode_like.py
