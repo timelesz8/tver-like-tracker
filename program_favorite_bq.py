@@ -1,151 +1,38 @@
 import os
 import json
-import time
-import re
-import logging
-import io
-from datetime import datetime, timezone
-
-import gspread
-from google.oauth2.service_account import Credentials
 from google.cloud import bigquery
+from google.oauth2 import service_account
 
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+# (中略：データ取得部分。favorite_count などを取得するコード)
 
-# =========================
-# 0. ログ設定
-# =========================
-LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
-logging.basicConfig(
-    level=getattr(logging, LOG_LEVEL, logging.INFO),
-    format="%(asctime)s [%(levelname)s] %(message)s",
-)
-logger = logging.getLogger(__name__)
-logger.info("お気に入り数 BigQuery版処理開始（UTC時間設定）")
-
-# =========================
-# 1. 設定と認証
-# =========================
-# BigQuery設定（テーブル名は実態に合わせて適宜修正してください）
-PROJECT_ID = 'tver-data'
-DATASET_ID = 'tver_raw_data'
-TABLE_ID = 'program_favorite_logs' 
-
-try:
+def upload_to_bigquery(data_list):
+    # 認証設定
     service_account_info = json.loads(os.environ["GCP_SA_KEY"])
-    SPREADSHEET_ID = os.environ["TVER_DATA_SHEET_ID"]
-except (KeyError, json.JSONDecodeError) as e:
-    logger.error(f"環境変数エラー: {e}")
-    raise
+    credentials = service_account.Credentials.from_service_account_info(service_account_info)
+    client = bigquery.Client(credentials=credentials, project=credentials.project_id)
 
-# 認証
-scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-creds = Credentials.from_service_account_info(service_account_info, scopes=scopes)
-client = gspread.authorize(creds)
-bq_client = bigquery.Client.from_service_account_info(service_account_info, project=PROJECT_ID)
+    # テーブルID（画像から確認したテーブル名）
+    table_id = f"{credentials.project_id}.tver_raw_data.favorite_logs"
 
-# =========================
-# 2. ブラウザ設定
-# =========================
-chrome_options = Options()
-chrome_options.add_argument("--headless=new")
-chrome_options.add_argument("--no-sandbox")
-chrome_options.add_argument("--disable-dev-shm-usage")
-chrome_options.add_argument("--window-size=1920,1080")
-chrome_options.add_argument(
-    "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) "
-    "Chrome/122.0.0.0 Safari/537.36"
-)
+    # ジョブの設定（成功しているコードに準拠）
+    job_config = bigquery.LoadJobConfig(
+        # 画像 のスキーマ定義を明示的に指定
+        schema=[
+            bigquery.SchemaField("observed_at", "TIMESTAMP", mode="REQUIRED"),
+            bigquery.SchemaField("program_id", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("favorite_count", "INTEGER", mode="REQUIRED"),
+        ],
+        source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
+        write_disposition="WRITE_APPEND",
+        autodetect=False
+    )
 
-driver = webdriver.Chrome(options=chrome_options)
+    try:
+        # データの送信
+        load_job = client.load_table_from_json(data_list, table_id, job_config=job_config)
+        load_job.result()  # 完了を待機
+        print(f"BigQueryアップロード成功: {table_id}")
+    except Exception as e:
+        print(f"BigQueryアップロードエラー: {e}")
 
-# =========================
-# 3. メイン処理
-# =========================
-results_for_bq = []
-
-try:
-    spreadsheet = client.open_by_key(SPREADSHEET_ID)
-    program_sheet = spreadsheet.worksheet("program_master")
-    rows = program_sheet.get_all_records()
-
-    logger.info(f"シートから読み込んだ総行数: {len(rows)}行")
-
-    for idx, row in enumerate(rows):
-        # アクティブでない番組はスキップ
-        if str(row.get("active", "")).upper() != "TRUE":
-            continue
-
-        url = row.get("番組URL", "")
-        if not url:
-            continue
-
-        program_id = url.rstrip("/").split("/")[-1]
-
-        try:
-            logger.info(f"処理開始: {program_id}")
-            driver.get(url)
-            time.sleep(5) # 描画待ち
-
-            # お気に入りボタンの数値が含まれる要素を待機
-            wait = WebDriverWait(driver, 15)
-            elem = wait.until(
-                EC.presence_of_element_located(
-                    (By.CSS_SELECTOR, "[class^='FavoriteButton_count']")
-                )
-            )
-
-            text = elem.text
-            numbers = re.findall(r'[\d.,万]+', text)
-            
-            if not numbers:
-                logger.warning(f"{program_id}: 数値が見つかりませんでした")
-                continue
-
-            val = numbers[0].replace(",", "")
-            count = int(float(val.replace("万", "")) * 10000) if "万" in val else int(val)
-
-            # --- BigQuery送信用リストに格納 (UTC時間) ---
-            results_for_bq.append({
-                "observed_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"),
-                "program_id": program_id,
-                "favorite_count": count
-            })
-            logger.info(f"取得成功: {program_id} = {count} (UTC)")
-
-        except Exception as e:
-            logger.error(f"エラー発生 ({program_id}): {e}")
-
-    # =========================
-    # BigQueryへ一括アップロード
-    # =========================
-    if results_for_bq:
-        logger.info(f"BigQueryへ一括送信を開始します: {len(results_for_bq)}件")
-        table_ref = bq_client.dataset(DATASET_ID).table(TABLE_ID)
-        
-        json_data = "\n".join([json.dumps(d) for d in results_for_bq])
-        file_obj = io.StringIO(json_data)
-        
-        job_config = bigquery.LoadJobConfig(
-            source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
-            write_disposition="WRITE_APPEND",
-            autodetect=False
-        )
-        
-        load_job = bq_client.load_table_from_file(file_obj, table_ref, job_config=job_config)
-        load_job.result() # 完了待機
-        logger.info("BigQueryへの書き込みがすべて完了しました！")
-    else:
-        logger.warning("送信対象のデータが0件でした。")
-
-finally:
-    if driver:
-        driver.quit()
-        logger.info("Chrome終了OK")
-
-logger.info("全処理終了")
+# (中略：実行部分)
