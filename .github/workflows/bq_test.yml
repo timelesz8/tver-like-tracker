@@ -19,4 +19,4 @@ jobs:
         env:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
           TVER_DATA_SHEET_ID: ${{ secrets.TVER_DATA_SHEET_ID }}
-        run: python episode_like_bq.py
+        run: python bq_test_single.py
