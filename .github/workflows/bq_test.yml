@@ -1,10 +1,10 @@
 name: TVerデータ収集（BigQuery版：実験用）
 
 on:
-  workflow_dispatch: # GASから動かすための設定
+  workflow_dispatch: 
 
 jobs:
-  test-bq: # ここが重複していた可能性があります
+  test-bq:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -26,4 +26,6 @@ jobs:
       - name: BigQueryへデータを書き込み
         env:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
-        run: python program_favorite.py
+          # ここから下の2行が足りなかったので追加しました
+          TVER_DATA_SHEET_ID: ${{ secrets.TVER_DATA_SHEET_ID }}
+        run: python program_favorite_bq.py
