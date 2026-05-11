@@ -1,30 +1,29 @@
+name: TVerデータ収集（BigQuery版：実験用）
+
 on:
-  workflow_dispatch: # これが入っていれば、GASから WORKFLOW_ID 指定で叩けます
-  # schedule: ... (GitHub側のタイマーは消してOKです)
+  workflow_dispatch: # GASから動かすための設定
 
 jobs:
-  test-bq:
-
-
-  test-bq:
+  test-bq: # ここが重複していた可能性があります
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: コードのチェックアウト
+        uses: actions/checkout@v4
+
+      - name: Pythonのセットアップ
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-      
-      - name: Install dependencies
-        run: pip install selenium webdriver-manager gspread google-cloud-bigquery
-      
-      - name: Run BQ Update (Episode Likes)
-        env:
-          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
-          TVER_DATA_SHEET_ID: ${{ secrets.TVER_DATA_SHEET_ID }}
-        run: python episode_like_bq.py
 
-      - name: Run BQ Update (Program Favorites)
+      - name: 必要なライブラリのインストール
+        run: |
+          pip install google-cloud-bigquery google-auth selenium webdriver-manager gspread oauth2client
+
+      - name: BigQueryへデータを書き込み
         env:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
-          TVER_DATA_SHEET_ID: ${{ secrets.TVER_DATA_SHEET_ID }}
-        run: python program_favorite_bq.py
+        run: python program_favorite.py
