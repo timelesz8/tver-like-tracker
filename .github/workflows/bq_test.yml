@@ -1,11 +1,11 @@
-name: TVerデータ収集（BigQuery版：実験用）
-
 on:
-  schedule:
-    - cron: '10 * * * *'  # 本番の10分後などに設定
-  workflow_dispatch:
+  workflow_dispatch: # これが入っていれば、GASから WORKFLOW_ID 指定で叩けます
+  # schedule: ... (GitHub側のタイマーは消してOKです)
 
 jobs:
+  test-bq:
+
+
   test-bq:
     runs-on: ubuntu-latest
     steps:
