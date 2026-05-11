@@ -26,6 +26,10 @@ jobs:
       - name: BigQueryへデータを書き込み
         env:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
-          # ここから下の2行が足りなかったので追加しました
           TVER_DATA_SHEET_ID: ${{ secrets.TVER_DATA_SHEET_ID }}
-        run: python program_favorite_bq.py
+        run: |
+          # 1. いいね数を実行（ファイル名が episode_like_bq.py の場合）
+          python episode_like_bq.py
+          
+          # 2. お気に入り数を実行（ファイル名が program_favorite_bq.py の場合）
+          python program_favorite_bq.py
