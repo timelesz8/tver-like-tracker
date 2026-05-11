@@ -4,11 +4,11 @@ import time
 import re
 import logging
 import io
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone # UTCを使用するため修正
 
 import gspread
 from google.oauth2.service_account import Credentials
-from google.cloud import bigquery # BigQuery用に追加
+from google.cloud import bigquery 
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -25,13 +25,11 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
 logger = logging.getLogger(__name__)
-logger.info("BigQuery版処理開始")
+logger.info("BigQuery版処理開始（UTC時間設定）")
 
 # =========================
 # 1. 設定と認証
 # =========================
-JST = timezone(timedelta(hours=+9), "JST")
-
 # BigQuery設定
 PROJECT_ID = 'tver-data'
 DATASET_ID = 'tver_raw_data'
@@ -90,7 +88,7 @@ try:
         try:
             logger.info(f"処理開始: {episode_id}")
             driver.get(url)
-            time.sleep(5) # 安定のための5秒待機
+            time.sleep(5) 
 
             wait = WebDriverWait(driver, 15)
             selector = "button[aria-label*='いいね'] [class^='IconButton_label']"
@@ -106,19 +104,19 @@ try:
             val = numbers[0].replace(",", "")
             count = int(float(val.replace("万", "")) * 10000) if "万" in val else int(val)
 
-            # --- BigQuery送信用リストに格納 ---
+            # --- BigQuery送信用リストに格納 (UTC時間) ---
             results_for_bq.append({
-                "observed_at": datetime.now(JST).strftime("%Y-%m-%dT%H:%M:%S"),
+                "observed_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"),
                 "episode_id": episode_id,
                 "like_count": count
             })
-            logger.info(f"取得成功: {episode_id} = {count}")
+            logger.info(f"取得成功: {episode_id} = {count} (UTC)")
 
         except Exception as e:
             logger.error(f"取得エラー ({episode_id}): {e}")
 
     # =========================
-    # BigQueryへ一括アップロード (テストで成功したロジック)
+    # BigQueryへ一括アップロード
     # =========================
     if results_for_bq:
         logger.info(f"BigQueryへ一括送信を開始します: {len(results_for_bq)}件")
@@ -134,7 +132,7 @@ try:
         )
         
         load_job = bq_client.load_table_from_file(file_obj, table_ref, job_config=job_config)
-        load_job.result() # 完了待機
+        load_job.result() 
         logger.info("BigQueryへの書き込みがすべて完了しました！")
     else:
         logger.warning("送信対象のデータが0件でした。")
