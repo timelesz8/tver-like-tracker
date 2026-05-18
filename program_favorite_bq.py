@@ -30,7 +30,6 @@ logger.info("お気に入り数 BigQuery版処理開始（UTC時間設定）")
 # =========================
 # 1. 設定と認証
 # =========================
-# 画像 に合わせてテーブル名を favorite_logs に変更
 PROJECT_ID = 'tver-data'
 DATASET_ID = 'tver_raw_data'
 TABLE_ID = 'favorite_logs' 
@@ -77,79 +76,18 @@ try:
     logger.info(f"シートから読み込んだ総行数: {len(rows)}行")
 
     for idx, row in enumerate(rows):
+        # active列のチェック（大文字小文字を区別せずTRUEのみ対象）
         if str(row.get("active", "")).upper() != "TRUE":
             continue
 
-        url = row.get("番組URL", "")
-        if not url:
+        # 「番組URL」または「url」のどちらのカラム名にも対応できるように取得
+        url = row.get("番組URL", row.get("url", ""))
+        if not url or not isinstance(url, str):
             continue
 
-        program_id = url.rstrip("/").split("/")[-1]
+        # 末尾のハッシュやスラッシュを考慮してIDを抽出
+        program_id = url.split("?")[0].rstrip("/").split("/")[-1]
 
-        try:
-            logger.info(f"処理開始: {program_id}")
-            driver.get(url)
-            time.sleep(5) 
-
-            wait = WebDriverWait(driver, 15)
-            elem = wait.until(
-                EC.presence_of_element_located(
-                    (By.CSS_SELECTOR, "[class^='FavoriteButton_count']")
-                )
-            )
-
-            text = elem.text
-            numbers = re.findall(r'[\d.,万]+', text)
-            
-            if not numbers:
-                logger.warning(f"{program_id}: 数値が見つかりませんでした")
-                continue
-
-            val = numbers[0].replace(",", "")
-            count = int(float(val.replace("万", "")) * 10000) if "万" in val else int(val)
-
-            # --- BigQuery送信用リストに格納 (UTC時間) ---
-            results_for_bq.append({
-                "observed_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"),
-                "program_id": program_id,
-                "favorite_count": count
-            })
-            logger.info(f"取得成功: {program_id} = {count} (UTC)")
-
-        except Exception as e:
-            logger.error(f"エラー発生 ({program_id}): {e}")
-
-    # =========================
-    # BigQueryへ一括アップロード
-    # =========================
-    if results_for_bq:
-        logger.info(f"BigQueryへ一括送信を開始します: {len(results_for_bq)}件")
-        table_ref = bq_client.dataset(DATASET_ID).table(TABLE_ID)
-        
-        json_data = "\n".join([json.dumps(d) for d in results_for_bq])
-        file_obj = io.StringIO(json_data)
-        
-        job_config = bigquery.LoadJobConfig(
-            # スキーマを明示的に指定して、REQUIRED制約との不一致を防ぐ
-            schema=[
-                bigquery.SchemaField("observed_at", "TIMESTAMP", mode="REQUIRED"),
-                bigquery.SchemaField("program_id", "STRING", mode="REQUIRED"),
-                bigquery.SchemaField("favorite_count", "INTEGER", mode="REQUIRED"),
-            ],
-            source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
-            write_disposition="WRITE_APPEND",
-            autodetect=False
-        )
-        
-        load_job = bq_client.load_table_from_file(file_obj, table_ref, job_config=job_config)
-        load_job.result() # 完了待機
-        logger.info(f"BigQuery({TABLE_ID})への書き込みがすべて完了しました！")
-    else:
-        logger.warning("送信対象のデータが0件でした。")
-
-finally:
-    if driver:
-        driver.quit()
-        logger.info("Chrome終了OK")
-
-logger.info("全処理終了")
+        # 見出し文字列の誤認、または不正なURLをスキップするガード構文
+        if program_id in ["series_id", "url", "series"] or "tver.jp" not in url:
+            logger.info(f"スキ
