@@ -1,4 +1,4 @@
-name: TVerデータ収集（BigQuery版：実験用）
+name: TVerデータ収集（BigQuery版）
 
 on:
   workflow_dispatch: 
