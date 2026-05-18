@@ -71,7 +71,7 @@ results_for_bq = []
 
 try:
     spreadsheet = client.open_by_key(SPREADSHEET_ID)
-    program_sheet = spreadsheet.worksheet("program_master")
+    program_sheet = spreadsheet.worksheet("program_master_bq")
     rows = program_sheet.get_all_records()
 
     logger.info(f"シートから読み込んだ総行数: {len(rows)}行")
