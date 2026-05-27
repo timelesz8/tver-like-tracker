@@ -69,15 +69,15 @@ driver = webdriver.Chrome(options=chrome_options)
 results_for_bq = []
 
 try:
-    spreadsheet = client.open_by_key(SPREADSHEET_ID)
-    program_sheet = spreadsheet.worksheet("program_master_bq")
+    spreadsheet = client.open_by_key("14Imbti2TS_RVqX85smgF02DUnqwkpPAcwdCW19i2Aq8")
+    program_sheet = spreadsheet.worksheet("program_master")
     rows = program_sheet.get_all_records()
 
     logger.info(f"シートから読み込んだ総行数: {len(rows)}行")
 
     for idx, row in enumerate(rows):
         # active列のチェック（大文字小文字を区別せずTRUEのみ対象）
-        if str(row.get("active", "")).upper() != "TRUE":
+        if str(row.get("active_flag", "")).upper() != "TRUE":
             continue
 
         # 「番組URL」または「url」のどちらのカラム名にも対応できるように取得
