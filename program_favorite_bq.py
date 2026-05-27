@@ -69,7 +69,7 @@ driver = webdriver.Chrome(options=chrome_options)
 results_for_bq = []
 
 try:
-    spreadsheet = client.open_by_key("14Imbti2TS_RVqX85smgF02DUnqwkpPAcwdCW19i2Aq8")
+    spreadsheet = client.open_by_key(SPREADSHEET_ID)
     program_sheet = spreadsheet.worksheet("program_master")
     rows = program_sheet.get_all_records()
 
