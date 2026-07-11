@@ -128,7 +128,7 @@ try:
         job_config = bigquery.LoadJobConfig(
             source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
             write_disposition="WRITE_APPEND",
-            autodetect=False
+            autodetect=True
         )
         
         load_job = bq_client.load_table_from_file(file_obj, table_ref, job_config=job_config)
