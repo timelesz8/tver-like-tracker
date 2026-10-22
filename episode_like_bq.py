@@ -113,7 +113,16 @@ try:
             logger.info(f"取得成功: {episode_id} = {count} (UTC)")
 
         except Exception as e:
-            logger.error(f"取得エラー ({episode_id}): {e}")
+            logger.error(
+                f"取得エラー ({episode_id}): "
+                f"{type(e).__name__}: {str(e).splitlines()[0]}"
+            )
+            logger.error(f"現在のURL: {driver.current_url}")
+            logger.error(f"ページタイトル: {driver.title}")
+            logger.error(
+                f"いいねボタン数: "
+                f"{len(driver.find_elements(By.CSS_SELECTOR, 'button[aria-label*=\"いいね\"]'))}"
+            )
 
     # =========================
     # BigQueryへ一括アップロード
