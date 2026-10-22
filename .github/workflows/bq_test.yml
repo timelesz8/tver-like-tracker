@@ -19,10 +19,13 @@ jobs:
         with:
           python-version: '3.13'
           check-latest: true
-
+      
       - name: 必要なライブラリのインストール
         run: |
-          pip install google-cloud-bigquery google-auth selenium webdriver-manager gspread oauth2client
+          python -m pip install --upgrade "pip>=26.2.2"
+          python -m pip install --upgrade "certifi>=2026.10.19"
+          python -m pip install google-cloud-bigquery google-auth selenium webdriver-manager gspread oauth2client
+          python -m pip --version
 
       - name: BigQueryへデータを書き込み
         env:
